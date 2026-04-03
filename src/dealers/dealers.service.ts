@@ -109,8 +109,50 @@ export class DealersService {
     return updated;
   }
 
+  async setExpiresAt(
+    telegramId: bigint,
+    expiresAt: Date,
+    actorId?: bigint,
+  ): Promise<Dealer> {
+    const dealer = await this.prisma.dealer.findUnique({ where: { telegramId } });
+    if (!dealer) {
+      throw new NotFoundException('Дилер не найден');
+    }
+
+    const updated = await this.prisma.dealer.update({
+      where: { id: dealer.id },
+      data: { expiresAt },
+    });
+
+    await this.audit(actorId, 'DEALER_SET_EXPIRATION', 'dealers', dealer.id, {
+      telegramId: telegramId.toString(),
+      expiresAt,
+    });
+
+    return updated;
+  }
+
   async getDealerByTelegramId(telegramId: bigint): Promise<Dealer | null> {
     return this.prisma.dealer.findUnique({ where: { telegramId } });
+  }
+
+  async listDealers(page = 1, pageSize = 6) {
+    const total = await this.prisma.dealer.count();
+    const pageCount = Math.max(Math.ceil(total / pageSize), 1);
+    const currentPage = Math.min(Math.max(page, 1), pageCount);
+
+    const items = await this.prisma.dealer.findMany({
+      orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+      skip: (currentPage - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return {
+      items,
+      total,
+      page: currentPage,
+      pageCount,
+    };
   }
 
   isDealerBlocked(dealer: Dealer): { blocked: boolean; reason?: string } {

@@ -29,6 +29,6 @@ export class AddDealerDto {
 
   @Type(() => Number)
   @IsInt()
-  @Min(1)
+  @Min(0)
   keyLimit!: number;
 }

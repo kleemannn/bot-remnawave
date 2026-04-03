@@ -127,6 +127,88 @@ export class SubscriptionsService {
     });
   }
 
+  async listByDealerPaginated(
+    dealerTelegramId: bigint,
+    page = 1,
+    pageSize = 5,
+  ) {
+    const dealer = await this.getDealerOrThrow(dealerTelegramId);
+    const where = {
+      dealerId: dealer.id,
+      status: { not: SubscriptionStatus.DELETED },
+    };
+
+    const total = await this.prisma.subscription.count({ where });
+    const pageCount = Math.max(Math.ceil(total / pageSize), 1);
+    const currentPage = Math.min(Math.max(page, 1), pageCount);
+
+    const items = await this.prisma.subscription.findMany({
+      where,
+      include: { dealerUser: true, dealer: true },
+      orderBy: { createdAt: 'desc' },
+      skip: (currentPage - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return {
+      items,
+      total,
+      page: currentPage,
+      pageCount,
+    };
+  }
+
+  async searchByDealerUsername(
+    dealerTelegramId: bigint,
+    query: string,
+    page = 1,
+    pageSize = 5,
+  ) {
+    const dealer = await this.getDealerOrThrow(dealerTelegramId);
+    const where = {
+      dealerId: dealer.id,
+      status: { not: SubscriptionStatus.DELETED },
+      dealerUser: {
+        username: {
+          contains: query,
+          mode: 'insensitive' as const,
+        },
+      },
+    };
+
+    const total = await this.prisma.subscription.count({ where });
+    const pageCount = Math.max(Math.ceil(total / pageSize), 1);
+    const currentPage = Math.min(Math.max(page, 1), pageCount);
+
+    const items = await this.prisma.subscription.findMany({
+      where,
+      include: { dealerUser: true, dealer: true },
+      orderBy: { createdAt: 'desc' },
+      skip: (currentPage - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return {
+      items,
+      total,
+      page: currentPage,
+      pageCount,
+      query,
+    };
+  }
+
+  async getSubscriptionForDealer(dealerTelegramId: bigint, subscriptionId: string) {
+    const subscription = await this.getOwnedSubscriptionOrThrow(
+      dealerTelegramId,
+      subscriptionId,
+    );
+
+    return this.prisma.subscription.findUniqueOrThrow({
+      where: { id: subscription.id },
+      include: { dealerUser: true, dealer: true },
+    });
+  }
+
   async deleteSubscription(dealerTelegramId: bigint, subscriptionId: string): Promise<void> {
     const subscription = await this.getOwnedSubscriptionOrThrow(
       dealerTelegramId,
@@ -256,11 +338,17 @@ export class SubscriptionsService {
     };
   }
 
-  private async getOwnedSubscriptionOrThrow(dealerTelegramId: bigint, subscriptionId: string) {
+  private async getDealerOrThrow(dealerTelegramId: bigint) {
     const dealer = await this.dealersService.getDealerByTelegramId(dealerTelegramId);
     if (!dealer) {
       throw new NotFoundException('Дилер не найден');
     }
+
+    return dealer;
+  }
+
+  private async getOwnedSubscriptionOrThrow(dealerTelegramId: bigint, subscriptionId: string) {
+    const dealer = await this.getDealerOrThrow(dealerTelegramId);
 
     const subscription = await this.prisma.subscription.findFirst({
       where: {

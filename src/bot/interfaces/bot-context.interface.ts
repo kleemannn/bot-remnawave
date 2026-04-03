@@ -1,12 +1,16 @@
 import { Context } from 'telegraf';
-
-export interface CreateFlowState {
-  step: 'username' | 'days';
-  username?: string;
-}
+import {
+  BotFlow,
+  DealersViewState,
+  PendingAction,
+  SubscriptionsViewState,
+} from '../scenes/bot-scenes';
 
 export interface BotSession {
-  createFlow?: CreateFlowState;
+  flow?: BotFlow;
+  pendingAction?: PendingAction;
+  subscriptionsView?: SubscriptionsViewState;
+  dealersView?: DealersViewState;
 }
 
 export interface BotContext extends Context {
