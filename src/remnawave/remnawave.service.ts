@@ -1,5 +1,5 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import { ExternalServiceException } from '../common/errors/app-exceptions';
@@ -237,6 +237,18 @@ export class RemnawaveService {
           return null;
         }
 
+        if (
+          options.operation === 'createUser' &&
+          statusCode &&
+          statusCode >= 400 &&
+          statusCode < 500 &&
+          this.isDuplicateUsernameError(error)
+        ) {
+          throw new BadRequestException(
+            'Такой пользователь уже существует.',
+          );
+        }
+
         const payload = {
           operation: options.operation,
           method: options.method,
@@ -309,6 +321,49 @@ export class RemnawaveService {
 
   private getErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+  }
+
+  private getErrorPayload(error: unknown): unknown {
+    if (!error || typeof error !== 'object') {
+      return undefined;
+    }
+
+    return (error as { response?: { data?: unknown } }).response?.data;
+  }
+
+  private isDuplicateUsernameError(error: unknown): boolean {
+    const payload = this.getErrorPayload(error);
+    const message = this.stringifyErrorPayload(payload).toLowerCase();
+
+    if (!message) {
+      return false;
+    }
+
+    const mentionsUsername =
+      message.includes('username') || message.includes('user name');
+    const mentionsDuplicate =
+      message.includes('exist') ||
+      message.includes('taken') ||
+      message.includes('duplicate') ||
+      message.includes('already');
+
+    return mentionsUsername && mentionsDuplicate;
+  }
+
+  private stringifyErrorPayload(payload: unknown): string {
+    if (typeof payload === 'string') {
+      return payload;
+    }
+
+    if (!payload) {
+      return '';
+    }
+
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return '';
+    }
   }
 
   private isTimeoutError(error: unknown): boolean {
