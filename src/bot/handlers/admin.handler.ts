@@ -10,7 +10,13 @@ import { BOT_FLOW, AdminAddDealerFlow, AdminChangeExpirationFlow, AdminChangeLim
 import { callbackData } from '../utils/callback-data.util';
 import { formatDate } from '../utils/format.util';
 import { parseExpirationDate, parseNonNegativeInt, parsePositiveInt, parseTelegramId, sanitizeUsername } from '../utils/input.util';
-import { clearFlow, setDealersView, setFlow } from '../utils/session.util';
+import {
+  clearFlow,
+  clearFlowMessageId,
+  setDealersView,
+  setFlow,
+  setFlowMessageId,
+} from '../utils/session.util';
 import {
   deleteMessageById,
   getCurrentMessageId,
@@ -131,6 +137,7 @@ export class AdminHandler {
       () => this.dealersService.addDealer(dto, access.telegramId),
     );
     clearFlow(ctx);
+    clearFlowMessageId(ctx);
 
     await renderMessage(
       ctx,
@@ -150,6 +157,7 @@ export class AdminHandler {
     }
 
     clearFlow(ctx);
+    clearFlowMessageId(ctx);
     await this.listDealersForDeletion(ctx, 1);
   }
 
@@ -165,6 +173,7 @@ export class AdminHandler {
       () => this.dealersService.deleteDealer(BigInt(telegramId), access.telegramId),
     );
     clearFlow(ctx);
+    clearFlowMessageId(ctx);
 
     await this.listDealersForDeletion(
       ctx,
@@ -300,7 +309,7 @@ export class AdminHandler {
         data: { telegramId },
       });
 
-      await renderMessage(ctx, BotText.askTagSelection(), adminTagKeyboard());
+      await this.showFlowStep(ctx, BotText.askTagSelection(), adminTagKeyboard());
       return;
     }
 
@@ -356,7 +365,7 @@ export class AdminHandler {
       },
     });
 
-    await renderMessage(
+    await this.showFlowStep(
       ctx,
       BotText.confirmTagChange(flow.data.telegramId, tag),
       saveKeyboard(callbackData.adminConfirmChangeTag),
@@ -391,6 +400,7 @@ export class AdminHandler {
       ),
     );
     clearFlow(ctx);
+    clearFlowMessageId(ctx);
 
     await renderMessage(
       ctx,
@@ -455,6 +465,7 @@ export class AdminHandler {
       ),
     );
     clearFlow(ctx);
+    clearFlowMessageId(ctx);
 
     await renderMessage(
       ctx,
@@ -519,6 +530,7 @@ export class AdminHandler {
       ),
     );
     clearFlow(ctx);
+    clearFlowMessageId(ctx);
 
     await renderMessage(
       ctx,
@@ -603,7 +615,7 @@ export class AdminHandler {
         },
       });
 
-      await renderMessage(ctx, BotText.askTagSelection(), adminTagKeyboard());
+      await this.showFlowStep(ctx, BotText.askTagSelection(), adminTagKeyboard());
       return;
     }
 
@@ -643,7 +655,7 @@ export class AdminHandler {
         },
       });
 
-      await renderMessage(
+      await this.showFlowStep(
         ctx,
         BotText.confirmAddDealer({
           telegramId: flow.data.telegramId!,
@@ -658,7 +670,7 @@ export class AdminHandler {
     }
 
     if (flow.step === 'tag') {
-      await renderMessage(ctx, BotText.askTagSelection(), adminTagKeyboard());
+      await this.showFlowStep(ctx, BotText.askTagSelection(), adminTagKeyboard());
       return;
     }
 
@@ -679,6 +691,38 @@ export class AdminHandler {
     }
 
     await deleteMessageById(ctx, messageId);
+  }
+
+  private async showFlowStep(
+    ctx: BotContext,
+    text: string,
+    extra?: Record<string, unknown>,
+  ) {
+    if (!isCallbackContext(ctx)) {
+      await this.deleteActiveFlowMessage(ctx);
+    }
+
+    const messageId = await renderMessage(ctx, text, extra);
+    this.rememberFlowMessageId(ctx, messageId);
+  }
+
+  private rememberFlowMessageId(ctx: BotContext, messageId: number | null) {
+    if (typeof messageId === 'number') {
+      setFlowMessageId(ctx, messageId);
+      return;
+    }
+
+    clearFlowMessageId(ctx);
+  }
+
+  private async deleteActiveFlowMessage(ctx: BotContext) {
+    const messageId = ctx.session.flowMessageId;
+    if (typeof messageId !== 'number') {
+      return;
+    }
+
+    await deleteMessageById(ctx, messageId);
+    clearFlowMessageId(ctx);
   }
 
   private async handleDeleteDealerText(ctx: BotContext, _flow: AdminDeleteDealerFlow) {
@@ -730,11 +774,11 @@ export class AdminHandler {
         data: { telegramId: parsed.value },
       });
 
-      await renderMessage(ctx, BotText.askTagSelection(), adminTagKeyboard());
+      await this.showFlowStep(ctx, BotText.askTagSelection(), adminTagKeyboard());
       return;
     }
 
-    await renderMessage(ctx, BotText.askTagSelection(), adminTagKeyboard());
+    await this.showFlowStep(ctx, BotText.askTagSelection(), adminTagKeyboard());
   }
 
   private async handleChangeLimitText(ctx: BotContext, flow: AdminChangeLimitFlow) {
@@ -781,7 +825,7 @@ export class AdminHandler {
         },
       });
 
-      await renderMessage(
+      await this.showFlowStep(
         ctx,
         BotText.confirmLimitChange(flow.data.telegramId!, parsed.value),
         saveKeyboard(callbackData.adminConfirmChangeLimit),
@@ -842,7 +886,7 @@ export class AdminHandler {
         },
       });
 
-      await renderMessage(
+      await this.showFlowStep(
         ctx,
         BotText.confirmExpirationChange(
           flow.data.telegramId!,
