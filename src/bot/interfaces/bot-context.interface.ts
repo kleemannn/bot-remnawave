@@ -9,6 +9,7 @@ import {
 export interface BotSession {
   flow?: BotFlow;
   flowMessageId?: number;
+  createdSubscriptionLinks?: Record<string, string>;
   pendingAction?: PendingAction;
   subscriptionsView?: SubscriptionsViewState;
   dealersView?: DealersViewState;

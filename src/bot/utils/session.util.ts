@@ -22,6 +22,23 @@ export function setFlowMessageId(ctx: BotContext, messageId: number) {
   ensureSession(ctx).flowMessageId = messageId;
 }
 
+export function setCreatedSubscriptionLink(
+  ctx: BotContext,
+  subscriptionId: string,
+  link: string,
+) {
+  const session = ensureSession(ctx);
+  session.createdSubscriptionLinks ??= {};
+  session.createdSubscriptionLinks[subscriptionId] = link;
+}
+
+export function getCreatedSubscriptionLink(
+  ctx: BotContext,
+  subscriptionId: string,
+): string | undefined {
+  return ensureSession(ctx).createdSubscriptionLinks?.[subscriptionId];
+}
+
 export function setSubscriptionsView(ctx: BotContext, view: SubscriptionsViewState) {
   ensureSession(ctx).subscriptionsView = view;
 }

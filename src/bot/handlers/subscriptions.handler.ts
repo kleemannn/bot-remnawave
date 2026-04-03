@@ -14,11 +14,14 @@ import { sanitizeUsername, parsePositiveInt } from '../utils/input.util';
 import {
   clearFlow,
   clearFlowMessageId,
+  getCreatedSubscriptionLink,
   setFlow,
+  setCreatedSubscriptionLink,
   setFlowMessageId,
   setSubscriptionsView,
 } from '../utils/session.util';
 import {
+  answerCallback,
   deleteMessageById,
   getCurrentMessageId,
   isCallbackContext,
@@ -130,6 +133,10 @@ export class SubscriptionsHandler {
 
     clearFlow(ctx);
     clearFlowMessageId(ctx);
+    const copyableLink = result.happEncryptedUrl ?? result.subscriptionUrl;
+    if (copyableLink) {
+      setCreatedSubscriptionLink(ctx, result.subscription.id, copyableLink);
+    }
 
     await renderMessage(
       ctx,
@@ -144,14 +151,8 @@ export class SubscriptionsHandler {
         happEncryptedUrl: result.happEncryptedUrl,
         subscriptionUrl: result.subscriptionUrl,
       }),
-      dealerAfterCreateKeyboard(),
+      dealerAfterCreateKeyboard(result.subscription.id, Boolean(copyableLink)),
     );
-
-    const copyableLink = result.happEncryptedUrl ?? result.subscriptionUrl;
-    if (copyableLink) {
-      await ctx.reply('Скопируйте ключ сообщением ниже.');
-      await ctx.reply(copyableLink);
-    }
   }
 
   async startSearchFlow(ctx: BotContext) {
@@ -386,6 +387,20 @@ export class SubscriptionsHandler {
       createSubscriptionConfirmKeyboard(),
     );
     this.rememberFlowMessageId(ctx, getCurrentMessageId(ctx));
+  }
+
+  async showCreatedLink(ctx: BotContext, subscriptionId: string) {
+    const link = getCreatedSubscriptionLink(ctx, subscriptionId);
+    await answerCallback(ctx);
+
+    if (!link) {
+      await ctx.reply(
+        'Ключ для этой подписки в текущей сессии не найден. Создайте подписку заново или откройте ссылку сразу после создания.',
+      );
+      return;
+    }
+
+    await ctx.reply(link);
   }
 
   private async handleCreateSubscriptionText(

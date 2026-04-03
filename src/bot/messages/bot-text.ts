@@ -138,14 +138,6 @@ export const BotText = {
     happEncryptedUrl?: string;
     subscriptionUrl?: string;
   }) {
-    const footer: string[] = [];
-
-    if (result.happEncryptedUrl) {
-      footer.push(`🔗 HAPP: ${result.happEncryptedUrl}`);
-    } else if (result.subscriptionUrl) {
-      footer.push(`🔗 Ссылка: ${result.subscriptionUrl}`);
-    }
-
     return renderCard(
       '✅ Подписка создана',
       [
@@ -158,8 +150,8 @@ export const BotText = {
           buildRemnawaveOwnerTag(result.dealerUsername, result.dealerTelegramId),
         ),
         cardLine('📅', 'Действует до', formatDate(result.expiresAt)),
+        'Нажмите кнопку ниже, чтобы показать ключ отдельно.',
       ],
-      footer,
     );
   },
 

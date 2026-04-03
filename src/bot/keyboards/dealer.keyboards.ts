@@ -28,13 +28,28 @@ export function dealerMainMenuKeyboard(isDealer: boolean, isAdmin: boolean) {
   return inlineKeyboard(rows);
 }
 
-export function dealerAfterCreateKeyboard() {
-  return inlineKeyboard([
+export function dealerAfterCreateKeyboard(subscriptionId: string, hasLink: boolean) {
+  const rows: Button[][] = [];
+
+  if (hasLink) {
+    rows.push([
+      {
+        text: '📋 Показать ключ',
+        callback_data: callbackData.dealerCreatedLink(subscriptionId),
+      },
+    ]);
+  }
+
+  rows.push(
     [
       { text: '📦 Создать ещё', callback_data: callbackData.dealerCreateStart },
       { text: '📋 Мои подписки', callback_data: callbackData.subscriptionsList(1) },
     ],
     [{ text: '🔙 В меню', callback_data: callbackData.mainMenu }],
+  );
+
+  return inlineKeyboard([
+    ...rows,
   ]);
 }
 

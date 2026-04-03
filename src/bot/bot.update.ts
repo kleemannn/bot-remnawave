@@ -175,6 +175,14 @@ export class BotUpdate {
         return;
       }
 
+      if (data.startsWith('dealer:create:link:')) {
+        await this.subscriptionsHandler.showCreatedLink(
+          ctx,
+          data.split(':')[3],
+        );
+        return;
+      }
+
       if (data === 'dealer:search:start') {
         await this.subscriptionsHandler.startSearchFlow(ctx);
       }
