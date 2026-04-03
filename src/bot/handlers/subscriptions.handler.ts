@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { buildDealerScopedUsername } from '../../common/utils/dealer-scoped-username.util';
 import { DealersService } from '../../dealers/dealers.service';
 import { BOT_FLOW, DealerCreateSubscriptionFlow, DealerSearchSubscriptionFlow } from '../scenes/bot-scenes';
 import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
@@ -460,11 +459,6 @@ export class SubscriptionsHandler {
     await this.deleteCurrentUserMessage(ctx);
 
     if (flow.step === 'username') {
-      const access = await this.accessHandler.ensureDealer(ctx);
-      if (!access) {
-        return;
-      }
-
       const parsed = sanitizeUsername(text);
       if (!parsed.ok || !parsed.value) {
         await this.showCreatePrompt(
@@ -474,17 +468,11 @@ export class SubscriptionsHandler {
         return;
       }
 
-      const scopedUsername = buildDealerScopedUsername(
-        access.dealer.username,
-        access.dealer.telegramId,
-        parsed.value,
-      );
-
       setFlow(ctx, {
         type: BOT_FLOW.DEALER_CREATE_SUBSCRIPTION,
         step: 'days',
         data: {
-          username: scopedUsername,
+          username: parsed.value,
         },
       });
 
