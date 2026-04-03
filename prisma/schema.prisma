@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DealerTag {
+  STANDARD
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  DELETED
+}
+
+enum NotificationType {
+  DEALER_EXPIRY
+}
+
+model Admin {
+  id         String   @id @default(cuid())
+  telegramId BigInt   @unique @map("telegram_id")
+  username   String?  @map("username")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("admins")
+}
+
+model Dealer {
+  id           String      @id @default(cuid())
+  telegramId   BigInt      @unique @map("telegram_id")
+  username     String?     @map("username")
+  tag          DealerTag   @default(STANDARD)
+  isActive     Boolean     @default(true) @map("is_active")
+  expiresAt    DateTime    @map("expires_at")
+  keyLimit     Int         @default(0) @map("key_limit")
+  createdCount Int         @default(0) @map("created_count")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  dealerUsers   DealerUser[]
+  subscriptions Subscription[]
+  notifications Notification[]
+
+  @@index([expiresAt])
+  @@map("dealers")
+}
+
+model DealerUser {
+  id              String   @id @default(cuid())
+  dealerId         String   @map("dealer_id")
+  dealer           Dealer   @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  username         String   @map("username")
+  remnawaveUserId  String   @unique @map("remnawave_user_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  subscriptions Subscription[]
+
+  @@index([dealerId])
+  @@unique([dealerId, username])
+  @@map("dealer_users")
+}
+
+model Subscription {
+  id               String             @id @default(cuid())
+  dealerId          String             @map("dealer_id")
+  dealer            Dealer             @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  dealerUserId      String             @map("dealer_user_id")
+  dealerUser        DealerUser         @relation(fields: [dealerUserId], references: [id], onDelete: Cascade)
+  remnawaveUserId   String             @map("remnawave_user_id")
+  status            SubscriptionStatus @default(ACTIVE)
+  days              Int                @map("days")
+  expiresAt         DateTime           @map("expires_at")
+  pausedAt          DateTime?          @map("paused_at")
+  remainingSeconds  Int?               @map("remaining_seconds")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  @@index([dealerId])
+  @@index([dealerUserId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  dealerId    String           @map("dealer_id")
+  dealer      Dealer           @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  type        NotificationType @default(DEALER_EXPIRY)
+  daysBefore  Int              @map("days_before")
+  expiresOn   DateTime         @map("expires_on")
+  sentAt      DateTime         @default(now()) @map("sent_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@unique([dealerId, type, daysBefore, expiresOn])
+  @@index([dealerId])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    BigInt?  @map("actor_id")
+  action     String   @map("action")
+  entity     String   @map("entity")
+  entityId   String?  @map("entity_id")
+  metadata   Json?    @map("metadata")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([action])
+  @@map("audit_logs")
+}

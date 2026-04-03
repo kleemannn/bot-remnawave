@@ -1,0 +1,46 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: remna_bot_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: remna_user
+      POSTGRES_PASSWORD: remna_pass
+      POSTGRES_DB: remna_bot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U remna_user -d remna_bot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bot-network
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: remna_dealer_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1:3010:3000'
+    networks:
+      - bot-network
+      - remnawave-network
+
+volumes:
+  postgres_data:
+
+networks:
+  bot-network:
+    driver: bridge
+  remnawave-network:
+    external: true
