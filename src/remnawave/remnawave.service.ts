@@ -49,11 +49,17 @@ export class RemnawaveService {
   }
 
   async disableUser(remnawaveUserId: string): Promise<void> {
-    await this.postWithoutResult(`/users/${remnawaveUserId}/disable`, 'disableUser');
+    await this.postWithoutResult(
+      `/users/${remnawaveUserId}/actions/disable`,
+      'disableUser',
+    );
   }
 
   async enableUser(remnawaveUserId: string): Promise<void> {
-    await this.postWithoutResult(`/users/${remnawaveUserId}/enable`, 'enableUser');
+    await this.postWithoutResult(
+      `/users/${remnawaveUserId}/actions/enable`,
+      'enableUser',
+    );
   }
 
   async deleteUser(remnawaveUserId: string): Promise<void> {
