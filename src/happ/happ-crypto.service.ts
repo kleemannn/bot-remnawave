@@ -58,6 +58,7 @@ export class HappCryptoService {
 
     const obj = payload as Record<string, unknown>;
     const candidates = [
+      obj.encrypted_link,
       obj.encryptedUrl,
       obj.encrypted_url,
       obj.url,

@@ -4,40 +4,42 @@ import { CreateRemnawaveUserResult } from '../interfaces/create-user-result.inte
 
 @Injectable()
 export class RemnawaveAdapter {
-  // TODO: Уточнить точные поля/формат payload согласно актуальной версии Remnawave API.
   toCreateUserPayload(dto: CreateRemnawaveUserDto) {
     return {
       username: dto.username,
       squadId: dto.squadId,
-      expiresAt: dto.expiresAt.toISOString(),
+      expireAt: dto.expiresAt.toISOString(),
     };
   }
 
-  // TODO: Уточнить точные поля ответа create user в вашей версии Remnawave API.
   fromCreateUserResponse(data: unknown): CreateRemnawaveUserResult | null {
     if (!data || typeof data !== 'object') {
       return null;
     }
 
     const payload = data as Record<string, unknown>;
+    const response =
+      (payload.response as Record<string, unknown> | undefined) ?? payload;
+
     const userId =
-      payload.id ??
-      (payload.user as Record<string, unknown> | undefined)?.id ??
-      (payload.data as Record<string, unknown> | undefined)?.id;
+      response.uuid ??
+      response.id ??
+      (response.user as Record<string, unknown> | undefined)?.id ??
+      (response.data as Record<string, unknown> | undefined)?.id;
 
     if (!userId) {
       return null;
     }
 
     const subscriptionUrl =
-      payload.subscriptionUrl ??
-      payload.subscription_url ??
-      payload.url ??
-      payload.link ??
-      (payload.subscription as Record<string, unknown> | undefined)?.url ??
-      (payload.data as Record<string, unknown> | undefined)?.subscriptionUrl ??
-      (payload.data as Record<string, unknown> | undefined)?.subscription_url ??
-      (payload.data as Record<string, unknown> | undefined)?.url;
+      response.subscriptionUrl ??
+      response.subscription_url ??
+      response.url ??
+      response.link ??
+      (response.subscription as Record<string, unknown> | undefined)?.url ??
+      (response.data as Record<string, unknown> | undefined)?.subscriptionUrl ??
+      (response.data as Record<string, unknown> | undefined)?.subscription_url ??
+      (response.data as Record<string, unknown> | undefined)?.url;
 
     return {
       userId: String(userId),
@@ -48,10 +50,9 @@ export class RemnawaveAdapter {
     };
   }
 
-  // TODO: Уточнить endpoint/поля обновления срока действия пользователя.
   toUpdateExpiryPayload(expiresAt: Date) {
     return {
-      expiresAt: expiresAt.toISOString(),
+      expireAt: expiresAt.toISOString(),
     };
   }
 }
