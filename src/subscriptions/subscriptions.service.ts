@@ -299,17 +299,21 @@ export class SubscriptionsService {
       throw new BadRequestException('Подписка не находится в паузе.');
     }
 
-    if (!subscription.remainingSeconds || subscription.remainingSeconds <= 0) {
-      throw new BadRequestException('Невозможно возобновить: нет сохраненного остатка времени.');
-    }
-
-    const newExpiresAt = dayjs().add(subscription.remainingSeconds, 'second').toDate();
-
     await this.remnawaveService.enableUser(subscription.remnawaveUserId);
-    await this.remnawaveService.updateUserExpiry(
-      subscription.remnawaveUserId,
-      newExpiresAt,
-    );
+
+    const hasSavedRemainingSeconds =
+      typeof subscription.remainingSeconds === 'number' &&
+      subscription.remainingSeconds > 0;
+    const newExpiresAt = hasSavedRemainingSeconds
+      ? dayjs().add(subscription.remainingSeconds!, 'second').toDate()
+      : subscription.expiresAt;
+
+    if (hasSavedRemainingSeconds) {
+      await this.remnawaveService.updateUserExpiry(
+        subscription.remnawaveUserId,
+        newExpiresAt,
+      );
+    }
 
     const updated = await this.prisma.subscription.update({
       where: { id: subscription.id },
