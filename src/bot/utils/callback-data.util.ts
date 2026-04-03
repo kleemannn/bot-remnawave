@@ -12,6 +12,7 @@ export const callbackData = {
   subscriptionsList: (page = 1) => `subs:list:${page}`,
   subscriptionsSearchResults: (page = 1) => `subs:search:list:${page}`,
   subscriptionCard: (subscriptionId: string) => `subs:card:${subscriptionId}`,
+  subscriptionLink: (subscriptionId: string) => `subs:link:${subscriptionId}`,
   subscriptionPauseAsk: (subscriptionId: string) => `subs:pause:ask:${subscriptionId}`,
   subscriptionPauseConfirm: (subscriptionId: string) =>
     `subs:pause:confirm:${subscriptionId}`,

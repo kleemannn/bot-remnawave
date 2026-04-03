@@ -218,6 +218,14 @@ export class BotUpdate {
         return;
       }
 
+      if (data.startsWith('subs:link:')) {
+        await this.subscriptionsHandler.showSubscriptionLink(
+          ctx,
+          data.split(':')[2],
+        );
+        return;
+      }
+
       if (data.startsWith('subs:pause:ask:')) {
         await this.subscriptionsHandler.askPauseConfirmation(
           ctx,
@@ -429,6 +437,7 @@ export class BotUpdate {
 
   private async safeExecute(ctx: BotContext, action: () => Promise<void>) {
     try {
+      await this.subscriptionsHandler.cleanupShownLinkMessage(ctx);
       await action();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Неизвестная ошибка';

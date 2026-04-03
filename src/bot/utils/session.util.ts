@@ -39,6 +39,18 @@ export function getCreatedSubscriptionLink(
   return ensureSession(ctx).createdSubscriptionLinks?.[subscriptionId];
 }
 
+export function setSentSubscriptionLinkMessageId(ctx: BotContext, messageId: number) {
+  ensureSession(ctx).sentSubscriptionLinkMessageId = messageId;
+}
+
+export function getSentSubscriptionLinkMessageId(ctx: BotContext): number | undefined {
+  return ensureSession(ctx).sentSubscriptionLinkMessageId;
+}
+
+export function clearSentSubscriptionLinkMessageId(ctx: BotContext) {
+  ensureSession(ctx).sentSubscriptionLinkMessageId = undefined;
+}
+
 export function setSubscriptionsView(ctx: BotContext, view: SubscriptionsViewState) {
   ensureSession(ctx).subscriptionsView = view;
 }

@@ -349,6 +349,27 @@ export class SubscriptionsService {
     };
   }
 
+  async getSubscriptionLinkForDealer(
+    dealerTelegramId: bigint,
+    subscriptionId: string,
+  ): Promise<string> {
+    const subscription = await this.getOwnedSubscriptionOrThrow(
+      dealerTelegramId,
+      subscriptionId,
+    );
+
+    const subscriptionUrl = await this.remnawaveService.getUserSubscriptionUrl(
+      subscription.remnawaveUserId,
+    );
+    if (!subscriptionUrl) {
+      throw new NotFoundException(
+        'Подписка уже удалена в панели Remnawave. Список обновлен.',
+      );
+    }
+
+    return this.happCryptoService.encryptSubscriptionUrl(subscriptionUrl);
+  }
+
   private async getDealerOrThrow(dealerTelegramId: bigint) {
     const dealer = await this.dealersService.getDealerByTelegramId(dealerTelegramId);
     if (!dealer) {

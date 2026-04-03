@@ -76,6 +76,15 @@ export function subscriptionCardKeyboard(
 ) {
   const rows: Button[][] = [];
 
+  if (status !== SubscriptionStatus.DELETED) {
+    rows.push([
+      {
+        text: '📋 Ключ',
+        callback_data: callbackData.subscriptionLink(subscriptionId),
+      },
+    ]);
+  }
+
   if (status === SubscriptionStatus.ACTIVE) {
     rows.push([
       {

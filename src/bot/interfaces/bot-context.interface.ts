@@ -10,6 +10,7 @@ export interface BotSession {
   flow?: BotFlow;
   flowMessageId?: number;
   createdSubscriptionLinks?: Record<string, string>;
+  sentSubscriptionLinkMessageId?: number;
   pendingAction?: PendingAction;
   subscriptionsView?: SubscriptionsViewState;
   dealersView?: DealersViewState;

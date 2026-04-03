@@ -126,6 +126,33 @@ export class RemnawaveService {
     }
   }
 
+  async getUserSubscriptionUrl(remnawaveUserId: string): Promise<string | null> {
+    const baseUrl = this.configService.getOrThrow<string>('remnawave.baseUrl');
+    const token = this.configService.getOrThrow<string>('remnawave.token');
+
+    try {
+      const response = await firstValueFrom(
+        this.httpService.get(`${baseUrl}/users/${remnawaveUserId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          timeout: this.configService.get<number>('remnawave.timeoutMs', 10000),
+        }),
+      );
+
+      return this.adapter.fromCreateUserResponse(response.data)?.subscriptionUrl ?? null;
+    } catch (error) {
+      if (this.getErrorStatus(error) === 404) {
+        return null;
+      }
+
+      this.logger.error('Remnawave getUserSubscriptionUrl failed', error);
+      throw new InternalServerErrorException(
+        'Ошибка Remnawave API при получении ссылки пользователя',
+      );
+    }
+  }
+
   private getErrorStatus(error: unknown): number | undefined {
     if (!error || typeof error !== 'object') {
       return undefined;

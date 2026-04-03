@@ -14,10 +14,13 @@ import { sanitizeUsername, parsePositiveInt } from '../utils/input.util';
 import {
   clearFlow,
   clearFlowMessageId,
+  clearSentSubscriptionLinkMessageId,
   getCreatedSubscriptionLink,
+  getSentSubscriptionLinkMessageId,
   setFlow,
   setCreatedSubscriptionLink,
   setFlowMessageId,
+  setSentSubscriptionLinkMessageId,
   setSubscriptionsView,
 } from '../utils/session.util';
 import {
@@ -390,17 +393,44 @@ export class SubscriptionsHandler {
   }
 
   async showCreatedLink(ctx: BotContext, subscriptionId: string) {
-    const link = getCreatedSubscriptionLink(ctx, subscriptionId);
-    await answerCallback(ctx);
-
-    if (!link) {
-      await ctx.reply(
-        'Ключ для этой подписки в текущей сессии не найден. Создайте подписку заново или откройте ссылку сразу после создания.',
-      );
+    const access = await this.accessHandler.ensureDealer(ctx);
+    if (!access) {
       return;
     }
 
-    await ctx.reply(link);
+    await answerCallback(ctx);
+    const link =
+      getCreatedSubscriptionLink(ctx, subscriptionId) ??
+      (await this.subscriptionsService.getSubscriptionLinkForDealer(
+        access.telegramId,
+        subscriptionId,
+      ));
+
+    await this.sendSubscriptionLinkMessage(ctx, link);
+  }
+
+  async showSubscriptionLink(ctx: BotContext, subscriptionId: string) {
+    const access = await this.accessHandler.ensureDealer(ctx);
+    if (!access) {
+      return;
+    }
+
+    await answerCallback(ctx);
+    const link = await this.subscriptionsService.getSubscriptionLinkForDealer(
+      access.telegramId,
+      subscriptionId,
+    );
+    await this.sendSubscriptionLinkMessage(ctx, link);
+  }
+
+  async cleanupShownLinkMessage(ctx: BotContext) {
+    const messageId = getSentSubscriptionLinkMessageId(ctx);
+    if (typeof messageId !== 'number') {
+      return;
+    }
+
+    await deleteMessageById(ctx, messageId);
+    clearSentSubscriptionLinkMessageId(ctx);
   }
 
   private async handleCreateSubscriptionText(
@@ -562,5 +592,16 @@ export class SubscriptionsHandler {
     }
 
     await deleteMessageById(ctx, messageId);
+  }
+
+  private async sendSubscriptionLinkMessage(ctx: BotContext, link: string) {
+    await this.cleanupShownLinkMessage(ctx);
+    const sentMessage = await ctx.reply(link);
+    const messageId = (sentMessage as { message_id?: number }).message_id;
+    if (typeof messageId === 'number') {
+      setSentSubscriptionLinkMessageId(ctx, messageId);
+    } else {
+      clearSentSubscriptionLinkMessageId(ctx);
+    }
   }
 }
