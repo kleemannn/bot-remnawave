@@ -88,8 +88,8 @@ export class RemnawaveService {
     try {
       await firstValueFrom(
         this.httpService.patch(
-          `${baseUrl}/users/${remnawaveUserId}`,
-          this.adapter.toUpdateExpiryPayload(expiresAt),
+          `${baseUrl}/users`,
+          this.adapter.toUpdateExpiryPayload(remnawaveUserId, expiresAt),
           {
             headers: {
               Authorization: `Bearer ${token}`,

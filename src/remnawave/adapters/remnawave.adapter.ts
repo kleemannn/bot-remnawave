@@ -52,8 +52,9 @@ export class RemnawaveAdapter {
     };
   }
 
-  toUpdateExpiryPayload(expiresAt: Date) {
+  toUpdateExpiryPayload(userId: string, expiresAt: Date) {
     return {
+      uuid: userId,
       expireAt: expiresAt.toISOString(),
     };
   }
