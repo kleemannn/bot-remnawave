@@ -10,6 +10,16 @@ import { backToMenuKeyboard } from '../keyboards/common.keyboards';
 export class BotAccessHandler {
   constructor(private readonly authService: AuthService) {}
 
+  private accessWithDealer(
+    access: Awaited<ReturnType<BotAccessHandler['getAccess']>>,
+    dealer: Dealer,
+  ) {
+    return {
+      ...access,
+      dealer,
+    };
+  }
+
   async getAccess(ctx: BotContext): Promise<{
     telegramId: bigint;
     isAdmin: boolean;
@@ -41,13 +51,17 @@ export class BotAccessHandler {
     return access;
   }
 
-  async ensureDealer(ctx: BotContext) {
+  async ensureDealer(ctx: BotContext): Promise<{
+    telegramId: bigint;
+    isAdmin: boolean;
+    dealer: Dealer;
+  } | null> {
     const access = await this.getAccess(ctx);
     if (!access.dealer) {
       await renderMessage(ctx, BotText.notDealer(), backToMenuKeyboard());
       return null;
     }
 
-    return access;
+    return this.accessWithDealer(access, access.dealer);
   }
 }
