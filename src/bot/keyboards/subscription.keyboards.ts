@@ -10,6 +10,7 @@ interface SubscriptionListItem {
     username: string;
   };
   status: SubscriptionStatus;
+  expiresAt: Date;
 }
 
 export function createSubscriptionConfirmKeyboard() {
@@ -37,7 +38,7 @@ export function subscriptionsListKeyboard(
 ) {
   const rows: Button[][] = items.map((item) => [
     {
-      text: `👤 ${item.dealerUser.username} • ${statusChip(item.status)}`,
+      text: `👤 ${item.dealerUser.username} • ${statusChip(item.status, item.expiresAt)}`,
       callback_data: callbackData.subscriptionCard(item.id),
     },
   ]);
@@ -141,9 +142,9 @@ export function subscriptionActionSuccessKeyboard(mode: 'all' | 'search', page: 
   ]);
 }
 
-function statusChip(status: SubscriptionStatus): string {
+function statusChip(status: SubscriptionStatus, expiresAt: Date): string {
   return formatSubscriptionStatusLabel({
     status,
-    expiresAt: new Date(Date.now() + 60_000),
+    expiresAt,
   });
 }

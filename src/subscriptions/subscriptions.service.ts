@@ -125,7 +125,7 @@ export class SubscriptionsService {
       throw new NotFoundException('Дилер не найден');
     }
 
-    await this.syncDeletedSubscriptionsForDealer(dealer.id);
+    await this.syncSubscriptionsForDealer(dealer.id);
 
     return this.prisma.subscription.findMany({
       where: { dealerId: dealer.id, status: { not: SubscriptionStatus.DELETED } },
@@ -140,7 +140,7 @@ export class SubscriptionsService {
     pageSize = 5,
   ) {
     const dealer = await this.getDealerOrThrow(dealerTelegramId);
-    await this.syncDeletedSubscriptionsForDealer(dealer.id);
+    await this.syncSubscriptionsForDealer(dealer.id);
 
     const where = {
       dealerId: dealer.id,
@@ -174,7 +174,7 @@ export class SubscriptionsService {
     pageSize = 5,
   ) {
     const dealer = await this.getDealerOrThrow(dealerTelegramId);
-    await this.syncDeletedSubscriptionsForDealer(dealer.id);
+    await this.syncSubscriptionsForDealer(dealer.id);
 
     const where = {
       dealerId: dealer.id,
@@ -408,7 +408,7 @@ export class SubscriptionsService {
     return subscription;
   }
 
-  private async syncDeletedSubscriptionsForDealer(dealerId: string): Promise<void> {
+  private async syncSubscriptionsForDealer(dealerId: string): Promise<void> {
     const subscriptions = await this.prisma.subscription.findMany({
       where: {
         dealerId,
@@ -417,6 +417,10 @@ export class SubscriptionsService {
       select: {
         id: true,
         remnawaveUserId: true,
+        status: true,
+        expiresAt: true,
+        pausedAt: true,
+        remainingSeconds: true,
       },
     });
 
@@ -424,30 +428,59 @@ export class SubscriptionsService {
       return;
     }
 
-    const removedIds = (
+    const syncResults = (
       await Promise.all(
         subscriptions.map(async (subscription) => ({
-          id: subscription.id,
-          exists: await this.remnawaveService.userExists(subscription.remnawaveUserId),
+          subscription,
+          remote: await this.remnawaveService.getUserState(subscription.remnawaveUserId),
         })),
       )
-    )
-      .filter((subscription) => !subscription.exists)
-      .map((subscription) => subscription.id);
+    );
 
-    if (removedIds.length === 0) {
-      return;
-    }
+    await Promise.all(
+      syncResults.map(async ({ subscription, remote }) => {
+        if (!remote.exists) {
+          await this.prisma.subscription.updateMany({
+            where: {
+              id: subscription.id,
+              status: { not: SubscriptionStatus.DELETED },
+            },
+            data: {
+              status: SubscriptionStatus.DELETED,
+            },
+          });
+          return;
+        }
 
-    await this.prisma.subscription.updateMany({
-      where: {
-        id: { in: removedIds },
-        status: { not: SubscriptionStatus.DELETED },
-      },
-      data: {
-        status: SubscriptionStatus.DELETED,
-      },
-    });
+        const nextStatus =
+          remote.status === 'DISABLED'
+            ? SubscriptionStatus.PAUSED
+            : SubscriptionStatus.ACTIVE;
+        const nextExpiresAt = remote.expireAt ?? subscription.expiresAt;
+        const shouldClearPauseMeta = nextStatus === SubscriptionStatus.ACTIVE;
+        const changed =
+          subscription.status !== nextStatus ||
+          subscription.expiresAt.getTime() !== nextExpiresAt.getTime() ||
+          (shouldClearPauseMeta &&
+            (subscription.pausedAt !== null || subscription.remainingSeconds !== null));
+
+        if (!changed) {
+          return;
+        }
+
+        await this.prisma.subscription.update({
+          where: { id: subscription.id },
+          data: {
+            status: nextStatus,
+            expiresAt: nextExpiresAt,
+            pausedAt: shouldClearPauseMeta ? null : subscription.pausedAt,
+            remainingSeconds: shouldClearPauseMeta
+              ? null
+              : subscription.remainingSeconds,
+          },
+        });
+      }),
+    );
   }
 
   private async syncSubscriptionWithRemnawave(
