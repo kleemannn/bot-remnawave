@@ -1,7 +1,9 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
+import { ExternalServiceException } from '../common/errors/app-exceptions';
+import { AppLoggerService } from '../common/logger/app-logger.service';
 import { RemnawaveAdapter } from './adapters/remnawave.adapter';
 import { CreateRemnawaveUserDto } from './dto/create-remnawave-user.dto';
 import { CreateRemnawaveUserResult } from './interfaces/create-user-result.interface';
@@ -13,46 +15,44 @@ interface RemnawaveUserState {
   subscriptionUrl?: string;
 }
 
+type RemnawaveMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+
 @Injectable()
 export class RemnawaveService {
-  private readonly logger = new Logger(RemnawaveService.name);
-
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly adapter: RemnawaveAdapter,
+    private readonly logger: AppLoggerService,
   ) {}
 
   async createUser(dto: CreateRemnawaveUserDto): Promise<CreateRemnawaveUserResult> {
-    const baseUrl = this.configService.getOrThrow<string>('remnawave.baseUrl');
-    const token = this.configService.getOrThrow<string>('remnawave.token');
+    const responseData = await this.request<unknown>({
+      method: 'POST',
+      path: '/users',
+      operation: 'createUser',
+      data: this.adapter.toCreateUserPayload(dto),
+      safeToRetry: false,
+    });
 
-    try {
-      const response = await firstValueFrom(
-        this.httpService.post(
-          `${baseUrl}/users`,
-          this.adapter.toCreateUserPayload(dto),
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            timeout: this.configService.get<number>('remnawave.timeoutMs', 10000),
-          },
-        ),
+    const mapped = this.adapter.fromCreateUserResponse(responseData);
+    if (!mapped) {
+      this.logger.errorEvent(
+        'remnawave_create_user_invalid_response',
+        {
+          username: dto.username,
+        },
+        undefined,
+        RemnawaveService.name,
       );
-
-      const mapped = this.adapter.fromCreateUserResponse(response.data);
-      if (!mapped) {
-        this.logger.error('Remnawave API did not return user id', response.data);
-        throw new InternalServerErrorException('Не удалось создать пользователя в Remnawave');
-      }
-
-      return mapped;
-    } catch (error) {
-      this.logger.error('Remnawave createUser failed', error);
-      throw new InternalServerErrorException('Ошибка Remnawave API при создании пользователя');
+      throw new ExternalServiceException(
+        'Remnawave вернул некорректный ответ при создании пользователя.',
+        'remnawave',
+        'createUser',
+      );
     }
+
+    return mapped;
   }
 
   async disableUser(remnawaveUserId: string): Promise<void> {
@@ -70,46 +70,23 @@ export class RemnawaveService {
   }
 
   async deleteUser(remnawaveUserId: string): Promise<void> {
-    const baseUrl = this.configService.getOrThrow<string>('remnawave.baseUrl');
-    const token = this.configService.getOrThrow<string>('remnawave.token');
-
-    try {
-      await firstValueFrom(
-        this.httpService.delete(`${baseUrl}/users/${remnawaveUserId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          timeout: this.configService.get<number>('remnawave.timeoutMs', 10000),
-        }),
-      );
-    } catch (error) {
-      this.logger.error('Remnawave deleteUser failed', error);
-      throw new InternalServerErrorException('Ошибка Remnawave API при удалении пользователя');
-    }
+    await this.request({
+      method: 'DELETE',
+      path: `/users/${remnawaveUserId}`,
+      operation: 'deleteUser',
+      safeToRetry: true,
+      allow404: true,
+    });
   }
 
   async updateUserExpiry(remnawaveUserId: string, expiresAt: Date): Promise<void> {
-    const baseUrl = this.configService.getOrThrow<string>('remnawave.baseUrl');
-    const token = this.configService.getOrThrow<string>('remnawave.token');
-
-    try {
-      await firstValueFrom(
-        this.httpService.patch(
-          `${baseUrl}/users`,
-          this.adapter.toUpdateExpiryPayload(remnawaveUserId, expiresAt),
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            timeout: this.configService.get<number>('remnawave.timeoutMs', 10000),
-          },
-        ),
-      );
-    } catch (error) {
-      this.logger.error('Remnawave updateUserExpiry failed', error);
-      throw new InternalServerErrorException('Ошибка Remnawave API при обновлении срока подписки');
-    }
+    await this.request({
+      method: 'PATCH',
+      path: '/users',
+      operation: 'updateUserExpiry',
+      data: this.adapter.toUpdateExpiryPayload(remnawaveUserId, expiresAt),
+      safeToRetry: true,
+    });
   }
 
   async userExists(remnawaveUserId: string): Promise<boolean> {
@@ -118,30 +95,19 @@ export class RemnawaveService {
   }
 
   async getUserState(remnawaveUserId: string): Promise<RemnawaveUserState> {
-    const baseUrl = this.configService.getOrThrow<string>('remnawave.baseUrl');
-    const token = this.configService.getOrThrow<string>('remnawave.token');
+    const responseData = await this.request<unknown>({
+      method: 'GET',
+      path: `/users/${remnawaveUserId}`,
+      operation: 'getUserState',
+      safeToRetry: true,
+      allow404: true,
+    });
 
-    try {
-      const response = await firstValueFrom(
-        this.httpService.get(`${baseUrl}/users/${remnawaveUserId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          timeout: this.configService.get<number>('remnawave.timeoutMs', 10000),
-        }),
-      );
-
-      return this.parseUserState(response.data);
-    } catch (error) {
-      if (this.getErrorStatus(error) === 404) {
-        return { exists: false };
-      }
-
-      this.logger.error('Remnawave getUserState failed', error);
-      throw new InternalServerErrorException(
-        'Ошибка Remnawave API при проверке пользователя',
-      );
+    if (responseData === null) {
+      return { exists: false };
     }
+
+    return this.parseUserState(responseData);
   }
 
   async getUserSubscriptionUrl(remnawaveUserId: string): Promise<string | null> {
@@ -192,26 +158,182 @@ export class RemnawaveService {
   }
 
   private async postWithoutResult(path: string, operation: string): Promise<void> {
-    const baseUrl = this.configService.getOrThrow<string>('remnawave.baseUrl');
-    const token = this.configService.getOrThrow<string>('remnawave.token');
+    await this.request({
+      method: 'POST',
+      path,
+      operation,
+      data: {},
+      safeToRetry: true,
+    });
+  }
 
-    try {
-      await firstValueFrom(
-        this.httpService.post(
-          `${baseUrl}${path}`,
-          {},
+  private async request<T>(options: {
+    method: RemnawaveMethod;
+    path: string;
+    operation: string;
+    data?: unknown;
+    safeToRetry?: boolean;
+    allow404?: boolean;
+  }): Promise<T | null> {
+    const maxAttempts = options.safeToRetry
+      ? Math.max(this.configService.get<number>('remnawave.retryCount', 1) + 1, 1)
+      : 1;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        this.logger.debugEvent(
+          'remnawave_request_started',
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            timeout: this.configService.get<number>('remnawave.timeoutMs', 10000),
+            operation: options.operation,
+            method: options.method,
+            path: options.path,
+            attempt,
+            maxAttempts,
           },
-        ),
-      );
-    } catch (error) {
-      this.logger.error(`Remnawave ${operation} failed`, error);
-      throw new InternalServerErrorException('Ошибка Remnawave API');
+          RemnawaveService.name,
+        );
+
+        const response = await firstValueFrom(
+          this.httpService.request<T>({
+            method: options.method,
+            url: `${this.getBaseUrl()}${options.path}`,
+            data: options.data,
+            headers: this.getHeaders(),
+            timeout: this.configService.get<number>('remnawave.timeoutMs', 10000),
+          }),
+        );
+
+        this.logger.debugEvent(
+          'remnawave_request_succeeded',
+          {
+            operation: options.operation,
+            method: options.method,
+            path: options.path,
+            attempt,
+            statusCode: response.status,
+          },
+          RemnawaveService.name,
+        );
+
+        return response.data;
+      } catch (error) {
+        const statusCode = this.getErrorStatus(error);
+        const timeout = this.isTimeoutError(error);
+        const canRetry =
+          Boolean(options.safeToRetry) &&
+          attempt < maxAttempts &&
+          (timeout || !statusCode || statusCode === 429 || statusCode >= 500);
+
+        if (options.allow404 && statusCode === 404) {
+          this.logger.warnEvent(
+            'remnawave_request_not_found',
+            {
+              operation: options.operation,
+              path: options.path,
+              statusCode,
+            },
+            RemnawaveService.name,
+          );
+          return null;
+        }
+
+        const payload = {
+          operation: options.operation,
+          method: options.method,
+          path: options.path,
+          attempt,
+          maxAttempts,
+          statusCode,
+          timeout,
+          errorCode: this.getErrorCode(error),
+          errorMessage: this.getErrorMessage(error),
+        };
+
+        if (canRetry) {
+          this.logger.warnEvent(
+            'remnawave_request_retrying',
+            payload,
+            RemnawaveService.name,
+          );
+          await this.delay(
+            this.configService.get<number>('remnawave.retryDelayMs', 500),
+          );
+          continue;
+        }
+
+        this.logger.errorEvent(
+          'remnawave_request_failed',
+          payload,
+          error instanceof Error ? error.stack : undefined,
+          RemnawaveService.name,
+        );
+
+        throw new ExternalServiceException(
+          this.getOperationErrorMessage(options.operation),
+          'remnawave',
+          options.operation,
+          statusCode,
+          timeout,
+        );
+      }
     }
+
+    throw new ExternalServiceException(
+      this.getOperationErrorMessage(options.operation),
+      'remnawave',
+      options.operation,
+    );
+  }
+
+  private getBaseUrl(): string {
+    return this.configService
+      .getOrThrow<string>('remnawave.baseUrl')
+      .replace(/\/+$/, '');
+  }
+
+  private getHeaders() {
+    return {
+      Authorization: `Bearer ${this.configService.getOrThrow<string>('remnawave.token')}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  private getErrorCode(error: unknown): string | undefined {
+    if (!error || typeof error !== 'object') {
+      return undefined;
+    }
+
+    const code = (error as { code?: unknown }).code;
+    return typeof code === 'string' ? code : undefined;
+  }
+
+  private getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  private isTimeoutError(error: unknown): boolean {
+    const code = this.getErrorCode(error);
+    return code === 'ECONNABORTED' || code === 'ETIMEDOUT';
+  }
+
+  private getOperationErrorMessage(operation: string): string {
+    switch (operation) {
+      case 'createUser':
+        return 'Ошибка Remnawave API при создании пользователя';
+      case 'deleteUser':
+        return 'Ошибка Remnawave API при удалении пользователя';
+      case 'disableUser':
+        return 'Ошибка Remnawave API при постановке подписки на паузу';
+      case 'enableUser':
+        return 'Ошибка Remnawave API при возобновлении подписки';
+      case 'updateUserExpiry':
+        return 'Ошибка Remnawave API при обновлении срока подписки';
+      default:
+        return 'Ошибка Remnawave API';
+    }
+  }
+
+  private async delay(ms: number) {
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

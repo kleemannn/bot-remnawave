@@ -1,11 +1,13 @@
 import { plainToInstance } from 'class-transformer';
 import {
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
   Min,
+  Max,
   validateSync,
 } from 'class-validator';
 
@@ -56,6 +58,63 @@ class EnvironmentVariables {
   @IsOptional()
   @Matches(/^\d+$/)
   PORT?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  APP_VERSION?: string;
+
+  @IsOptional()
+  @IsIn(['error', 'warn', 'log', 'debug', 'verbose'])
+  APP_LOG_LEVEL?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1000)
+  @Max(60000)
+  BOT_RATE_LIMIT_WINDOW_MS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  BOT_RATE_LIMIT_MAX_TEXTS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  BOT_RATE_LIMIT_MAX_CALLBACKS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  BOT_RATE_LIMIT_MAX_COMMANDS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1000)
+  @Max(60000)
+  BOT_EXPENSIVE_ACTION_COOLDOWN_MS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(5)
+  REMNAWAVE_RETRY_COUNT?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(100)
+  @Max(10000)
+  REMNAWAVE_RETRY_DELAY_MS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1000)
+  @Max(30000)
+  HEALTHCHECK_DB_TIMEOUT_MS?: number;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
@@ -65,7 +124,10 @@ export function validateEnv(config: Record<string, unknown>) {
 
   const errors = validateSync(validatedConfig, { skipMissingProperties: false });
   if (errors.length > 0) {
-    throw new Error(errors.toString());
+    const constraints = errors
+      .flatMap((error) => Object.values(error.constraints ?? {}))
+      .join('; ');
+    throw new Error(`Ошибка валидации ENV: ${constraints}`);
   }
   return validatedConfig;
 }

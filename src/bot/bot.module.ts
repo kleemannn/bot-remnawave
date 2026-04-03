@@ -10,6 +10,7 @@ import { DealerProfileHandler } from './handlers/dealer-profile.handler';
 import { SubscriptionsHandler } from './handlers/subscriptions.handler';
 import { AdminHandler } from './handlers/admin.handler';
 import { BotAccessHandler } from './handlers/bot-access.handler';
+import { BotProtectionService } from './services/bot-protection.service';
 
 @Module({
   imports: [AuthModule, DealersModule, SubscriptionsModule],
@@ -20,6 +21,7 @@ import { BotAccessHandler } from './handlers/bot-access.handler';
     SubscriptionsHandler,
     AdminHandler,
     BotAccessHandler,
+    BotProtectionService,
     AdminGuard,
     DealerGuard,
   ],

@@ -84,7 +84,9 @@ model Subscription {
   updatedAt         DateTime           @updatedAt @map("updated_at")
 
   @@index([dealerId])
+  @@index([dealerId, status])
   @@index([dealerUserId])
+  @@index([remnawaveUserId])
   @@index([status])
   @@map("subscriptions")
 }
@@ -114,5 +116,8 @@ model AuditLog {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([action])
+  @@index([actorId])
+  @@index([entity, entityId])
+  @@index([createdAt])
   @@map("audit_logs")
 }

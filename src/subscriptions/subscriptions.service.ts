@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { DealerTag, SubscriptionStatus } from '@prisma/client';
 import dayjs from 'dayjs';
+import { AuditService } from '../common/audit/audit.service';
 import { buildRemnawaveOwnerTag } from '../common/utils/remnawave-owner-tag.util';
 import { DealersService } from '../dealers/dealers.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -22,6 +23,7 @@ export class SubscriptionsService {
     private readonly remnawaveService: RemnawaveService,
     private readonly happCryptoService: HappCryptoService,
     private readonly configService: ConfigService,
+    private readonly auditService: AuditService,
   ) {}
 
   async createForDealer(
@@ -86,23 +88,28 @@ export class SubscriptionsService {
         data: { createdCount: { increment: 1 } },
       });
 
-      await tx.auditLog.create({
-        data: {
-          actorId: dealerTelegramId,
-          action: 'SUBSCRIPTION_CREATE',
-          entity: 'subscriptions',
-          entityId: subscription.id,
-          metadata: {
-            username: dto.username,
-            days: dto.days,
-            squadId,
-            ownerTag,
-            remnawaveUserId: remote.userId,
-          },
-        },
-      });
-
       return subscription;
+    });
+
+    await this.auditService.record({
+      actorId: dealerTelegramId,
+      actorRole: 'dealer',
+      action: 'SUBSCRIPTION_CREATE',
+      entity: 'subscriptions',
+      entityId: subscription.id,
+      success: true,
+      newState: {
+        id: subscription.id,
+        status: subscription.status,
+        expiresAt: subscription.expiresAt,
+      },
+      metadata: {
+        username: dto.username,
+        days: dto.days,
+        squadId,
+        ownerTag,
+        remnawaveUserId: remote.userId,
+      },
     });
 
     let happEncryptedUrl: string | undefined;
@@ -225,23 +232,30 @@ export class SubscriptionsService {
       dealerTelegramId,
       subscriptionId,
     );
+    const previousState = {
+      status: subscription.status,
+      expiresAt: subscription.expiresAt,
+      remnawaveUserId: subscription.remnawaveUserId,
+    };
 
     await this.remnawaveService.deleteUser(subscription.remnawaveUserId);
 
-    await this.prisma.subscription.update({
+    const updated = await this.prisma.subscription.update({
       where: { id: subscription.id },
       data: {
         status: SubscriptionStatus.DELETED,
       },
     });
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: dealerTelegramId,
-        action: 'SUBSCRIPTION_DELETE',
-        entity: 'subscriptions',
-        entityId: subscription.id,
-      },
+    await this.auditService.record({
+      actorId: dealerTelegramId,
+      actorRole: 'dealer',
+      action: 'SUBSCRIPTION_DELETE',
+      entity: 'subscriptions',
+      entityId: subscription.id,
+      success: true,
+      previousState,
+      newState: updated,
     });
   }
 
@@ -274,15 +288,20 @@ export class SubscriptionsService {
       },
     });
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: dealerTelegramId,
-        action: 'SUBSCRIPTION_PAUSE',
-        entity: 'subscriptions',
-        entityId: subscription.id,
-        metadata: {
-          remainingSeconds,
-        },
+    await this.auditService.record({
+      actorId: dealerTelegramId,
+      actorRole: 'dealer',
+      action: 'SUBSCRIPTION_PAUSE',
+      entity: 'subscriptions',
+      entityId: subscription.id,
+      success: true,
+      previousState: {
+        status: subscription.status,
+        expiresAt: subscription.expiresAt,
+      },
+      newState: updated,
+      metadata: {
+        remainingSeconds,
       },
     });
 
@@ -325,15 +344,21 @@ export class SubscriptionsService {
       },
     });
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: dealerTelegramId,
-        action: 'SUBSCRIPTION_RESUME',
-        entity: 'subscriptions',
-        entityId: subscription.id,
-        metadata: {
-          newExpiresAt,
-        },
+    await this.auditService.record({
+      actorId: dealerTelegramId,
+      actorRole: 'dealer',
+      action: 'SUBSCRIPTION_RESUME',
+      entity: 'subscriptions',
+      entityId: subscription.id,
+      success: true,
+      previousState: {
+        status: subscription.status,
+        expiresAt: subscription.expiresAt,
+        remainingSeconds: subscription.remainingSeconds,
+      },
+      newState: updated,
+      metadata: {
+        newExpiresAt,
       },
     });
 
@@ -409,7 +434,10 @@ export class SubscriptionsService {
       );
     }
 
-    return subscription;
+    return this.prisma.subscription.findUniqueOrThrow({
+      where: { id: subscription.id },
+      include: { dealerUser: true },
+    });
   }
 
   private async syncSubscriptionsForDealer(dealerId: string): Promise<void> {
@@ -491,18 +519,58 @@ export class SubscriptionsService {
     subscriptionId: string,
     remnawaveUserId: string,
   ): Promise<boolean> {
-    const exists = await this.remnawaveService.userExists(remnawaveUserId);
-    if (exists) {
+    const remote = await this.remnawaveService.getUserState(remnawaveUserId);
+    if (!remote.exists) {
+      await this.prisma.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          status: SubscriptionStatus.DELETED,
+        },
+      });
+
+      return false;
+    }
+
+    const current = await this.prisma.subscription.findUnique({
+      where: { id: subscriptionId },
+      select: {
+        status: true,
+        expiresAt: true,
+        pausedAt: true,
+        remainingSeconds: true,
+      },
+    });
+
+    if (!current) {
+      return false;
+    }
+
+    const nextStatus =
+      remote.status === 'DISABLED'
+        ? SubscriptionStatus.PAUSED
+        : SubscriptionStatus.ACTIVE;
+    const nextExpiresAt = remote.expireAt ?? current.expiresAt;
+    const shouldClearPauseMeta = nextStatus === SubscriptionStatus.ACTIVE;
+    const changed =
+      current.status !== nextStatus ||
+      current.expiresAt.getTime() !== nextExpiresAt.getTime() ||
+      (shouldClearPauseMeta &&
+        (current.pausedAt !== null || current.remainingSeconds !== null));
+
+    if (!changed) {
       return true;
     }
 
     await this.prisma.subscription.update({
       where: { id: subscriptionId },
       data: {
-        status: SubscriptionStatus.DELETED,
+        status: nextStatus,
+        expiresAt: nextExpiresAt,
+        pausedAt: shouldClearPauseMeta ? null : current.pausedAt,
+        remainingSeconds: shouldClearPauseMeta ? null : current.remainingSeconds,
       },
     });
 
-    return false;
+    return true;
   }
 }

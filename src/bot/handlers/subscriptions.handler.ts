@@ -40,6 +40,7 @@ import {
 import { confirmationKeyboard, inlineKeyboard } from '../keyboards/common.keyboards';
 import { callbackData } from '../utils/callback-data.util';
 import { dealerAfterCreateKeyboard } from '../keyboards/dealer.keyboards';
+import { BotProtectionService } from '../services/bot-protection.service';
 
 @Injectable()
 export class SubscriptionsHandler {
@@ -48,6 +49,7 @@ export class SubscriptionsHandler {
     private readonly dealersService: DealersService,
     private readonly accessHandler: BotAccessHandler,
     private readonly menuHandler: MenuHandler,
+    private readonly protectionService: BotProtectionService,
   ) {}
 
   async handleText(ctx: BotContext): Promise<boolean> {
@@ -132,7 +134,11 @@ export class SubscriptionsHandler {
       return;
     }
 
-    const result = await this.subscriptionsService.createForDealer(access.telegramId, dto);
+    const result = await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `subscription:create:${dto.username}`,
+      () => this.subscriptionsService.createForDealer(access.telegramId, dto),
+    );
 
     clearFlow(ctx);
     clearFlowMessageId(ctx);
@@ -291,7 +297,11 @@ export class SubscriptionsHandler {
       return;
     }
 
-    await this.subscriptionsService.pauseSubscription(access.telegramId, subscriptionId);
+    await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `subscription:pause:${subscriptionId}`,
+      () => this.subscriptionsService.pauseSubscription(access.telegramId, subscriptionId),
+    );
     const view = ctx.session.subscriptionsView ?? { mode: 'all' as const, page: 1 };
 
     await renderMessage(
@@ -317,7 +327,11 @@ export class SubscriptionsHandler {
       return;
     }
 
-    await this.subscriptionsService.resumeSubscription(access.telegramId, subscriptionId);
+    await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `subscription:resume:${subscriptionId}`,
+      () => this.subscriptionsService.resumeSubscription(access.telegramId, subscriptionId),
+    );
     const view = ctx.session.subscriptionsView ?? { mode: 'all' as const, page: 1 };
 
     await renderMessage(
@@ -343,7 +357,11 @@ export class SubscriptionsHandler {
       return;
     }
 
-    await this.subscriptionsService.deleteSubscription(access.telegramId, subscriptionId);
+    await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `subscription:delete:${subscriptionId}`,
+      () => this.subscriptionsService.deleteSubscription(access.telegramId, subscriptionId),
+    );
     const view = ctx.session.subscriptionsView ?? { mode: 'all' as const, page: 1 };
 
     await renderMessage(

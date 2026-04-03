@@ -1,180 +1,234 @@
 # Remnawave Dealer Bot
 
-Production-ready Telegram dealer bot for Remnawave on single VPS.
+Telegram dealer bot for Remnawave on NestJS, Telegraf, Prisma and PostgreSQL. Проект рассчитан на один VPS и один compose-стек без лишней инфраструктуры.
 
-## Stack
+## Что уже есть
 
-- Node.js 20+
-- TypeScript
-- NestJS
-- Prisma ORM
-- PostgreSQL
-- Telegraf (`nestjs-telegraf`)
-- pnpm
-- Docker + Docker Compose
-- Caddy (existing, optional for reverse proxy)
+- роли `admin` / `dealer`
+- теги дилеров `standard` / `premium`
+- лимиты ключей и срок доступа дилера
+- создание, пауза, возобновление и удаление подписок
+- Remnawave API integration
+- напоминания о скором окончании доступа дилера
+- health endpoints
+- rate limiting и защита от повторных кликов
+- structured logging и audit trail
 
-## Project Structure
+## Структура
 
 ```text
-.
-├── prisma/
-│   └── schema.prisma
-├── src/
-│   ├── app.controller.ts
-│   ├── app.module.ts
-│   ├── main.ts
-│   ├── auth/
-│   │   ├── auth.module.ts
-│   │   └── auth.service.ts
-│   ├── bot/
-│   │   ├── bot.module.ts
-│   │   ├── bot.update.ts
-│   │   └── interfaces/
-│   │       └── bot-context.interface.ts
-│   ├── common/
-│   │   ├── config/
-│   │   │   ├── configuration.ts
-│   │   │   └── env.validation.ts
-│   │   ├── guards/
-│   │   │   ├── admin.guard.ts
-│   │   │   └── dealer.guard.ts
-│   │   └── logger/
-│   │       ├── app-logger.service.ts
-│   │       └── logger.module.ts
-│   ├── dealers/
-│   │   ├── dto/
-│   │   │   ├── add-dealer.dto.ts
-│   │   │   └── update-tag.dto.ts
-│   │   ├── dealers.module.ts
-│   │   └── dealers.service.ts
-│   ├── notifications/
-│   │   ├── notifications.module.ts
-│   │   └── notifications.service.ts
-│   ├── happ/
-│   │   ├── happ.module.ts
-│   │   └── happ-crypto.service.ts
-│   ├── prisma/
-│   │   ├── prisma.module.ts
-│   │   └── prisma.service.ts
-│   ├── remnawave/
-│   │   ├── adapters/
-│   │   │   └── remnawave.adapter.ts
-│   │   ├── dto/
-│   │   │   └── create-remnawave-user.dto.ts
-│   │   ├── remnawave.module.ts
-│   │   └── remnawave.service.ts
-│   └── subscriptions/
-│       ├── dto/
-│       │   └── create-subscription.dto.ts
-│       ├── subscriptions.module.ts
-│       └── subscriptions.service.ts
-├── .env.example
-├── Dockerfile
-├── docker-compose.yml
-└── package.json
+src/
+  app.module.ts
+  main.ts
+  health/
+  auth/
+  bot/
+  common/
+    audit/
+    config/
+    errors/
+    guards/
+    logger/
+    utils/
+  dealers/
+  notifications/
+  prisma/
+  remnawave/
+  subscriptions/
+prisma/schema.prisma
+Dockerfile
+docker-compose.yml
+.env.example
 ```
 
-## Environment
+## ENV
 
-Copy and edit env:
+Скопируйте шаблон и заполните реальные значения:
 
 ```bash
 cp .env.example .env
 ```
 
-Required variables:
+Обязательные переменные:
 
+- `DATABASE_URL`
 - `TELEGRAM_BOT_TOKEN`
-- `ADMIN_TELEGRAM_IDS` (comma-separated Telegram IDs)
+- `ADMIN_TELEGRAM_IDS`
 - `REMNAWAVE_API_BASE_URL`
 - `REMNAWAVE_API_TOKEN`
 - `STANDARD_SQUAD_ID`
 - `PREMIUM_SQUAD_ID`
-- `DATABASE_URL`
-- `HAPP_CRYPTO_API_URL` (optional, default `https://crypto.happ.su/api-v2.php`)
-- `HAPP_CRYPTO_TIMEOUT_MS` (optional)
 
-For setup with existing Remnawave container on same VPS:
+Полезные production-переменные:
 
-- `REMNAWAVE_API_BASE_URL=http://remnawave:3000/api`
-- Bot service must be attached to external docker network `remnawave-network`.
+- `APP_LOG_LEVEL=log`
+- `REMNAWAVE_TIMEOUT_MS=10000`
+- `REMNAWAVE_RETRY_COUNT=1`
+- `REMNAWAVE_RETRY_DELAY_MS=500`
+- `BOT_RATE_LIMIT_WINDOW_MS=10000`
+- `BOT_RATE_LIMIT_MAX_TEXTS=12`
+- `BOT_RATE_LIMIT_MAX_CALLBACKS=24`
+- `BOT_RATE_LIMIT_MAX_COMMANDS=12`
+- `BOT_EXPENSIVE_ACTION_COOLDOWN_MS=3000`
+- `HEALTHCHECK_DB_TIMEOUT_MS=3000`
 
-## Deploy (Single VPS)
+## Deploy На VPS
 
-```bash
-docker compose up -d --build
-```
-
-Healthcheck:
-
-```bash
-curl http://127.0.0.1:3010/health
-```
-
-If external network is missing, create it once:
+Если внешняя docker-сеть для Remnawave еще не создана:
 
 ```bash
 docker network create remnawave-network
 ```
 
-If you use Caddy on host, proxy bot to local port:
+Обычный деплой:
 
-```caddy
-bot.yourdomain.com {
-    reverse_proxy 127.0.0.1:3010
-}
+```bash
+git pull
+docker compose build --no-cache bot
+docker compose up -d --force-recreate bot
+docker compose logs -f bot
 ```
 
-## Telegram Commands (RU UI)
+Первый запуск всей пачки:
 
-### Admin
+```bash
+docker compose up -d --build
+```
 
-- `/add_dealer <tg_id> <username> <standard|premium> <days> <limit>`
-- `/delete_dealer <tg_id>`
-- `/dealer_on <tg_id>`
-- `/dealer_off <tg_id>`
-- `/set_tag <tg_id> <standard|premium>`
-- `/set_limit <tg_id> <limit>`
-- `/extend <tg_id> <days>`
-- `/stats`
+## Health И Runtime Проверки
 
-### Dealer
+Приложение слушает `127.0.0.1:3011` на хосте.
 
-- `/me`
-- `/create` (interactive: username -> days)
-- `/my_subs`
-- `/delete <subscription_id>`
-- `/pause <subscription_id>`
-- `/resume <subscription_id>`
-- `/expiry <subscription_id>`
+Проверки:
 
-After `/create`, bot returns encrypted HAPP link (`happ://...`) when Remnawave response includes source subscription URL.
+```bash
+curl http://127.0.0.1:3011/health
+curl http://127.0.0.1:3011/health/ready
+```
 
-## Security Notes
+Что проверяет:
 
-- Remnawave API token only in `.env`.
-- Admin access controlled by `ADMIN_TELEGRAM_IDS` whitelist.
-- Dealer commands allowed only for registered dealers.
-- Input validation via DTO + `class-validator`.
-- No sensitive token output in bot replies.
+- `/health` — liveness
+- `/health/ready` — готовность приложения и доступность PostgreSQL
 
-## Remnawave API Adapter
+## Логи
 
-Unknown/variable Remnawave API payload fields are isolated in:
+Логи теперь структурированы по событиям:
 
-- `src/remnawave/adapters/remnawave.adapter.ts`
+- `app_bootstrap_complete`
+- `prisma_connected`
+- `remnawave_request_*`
+- `bot_handler_error`
+- `dealer_expiry_reminders_*`
+- `bot_admin_access_denied`
+- `bot_dealer_access_denied`
 
-Update TODO mappings there without touching business logic.
+Полезные команды:
 
-## Notification Scheduler
+```bash
+docker compose logs -f bot
+docker compose logs --tail=200 bot
+docker compose logs -f postgres
+```
 
-- Cron runs daily at `10:00` server time.
-- Sends reminders before dealer expiration at 7, 3, 1 day.
-- Writes send history into `notifications` table.
+В логах не должны появляться токены, пароли и `Authorization` headers.
 
-## Operational Notes
+## Safety И Abuse Protection
 
-- Bot runs as single NestJS monolith.
-- PostgreSQL and bot are in one compose stack.
-- Bot listens on `127.0.0.1:3010` on host (via Docker port mapping).
+- Входящие сообщения и callback-и ограничены rate limit-ом.
+- Дорогие операции защищены от повторных кликов коротким cooldown.
+- UI-ограничения дублируются server-side проверками.
+- Дилер не может получить чужую подписку даже через crafted callback.
+- Ошибки Remnawave не отдаются пользователю raw stack trace-ом.
+
+## Audit Trail
+
+В `audit_logs` пишутся как минимум:
+
+- создание / удаление дилера
+- активация / деактивация дилера
+- изменение тега
+- изменение лимита
+- изменение срока доступа
+- создание / пауза / возобновление / удаление подписки
+- отправка системных reminder-ов
+
+Запись содержит:
+
+- `actorId`
+- `action`
+- `entity`
+- `entityId`
+- `metadata`
+
+В `metadata` хранится `actorRole`, `success`, `previousState`, `newState`, `details`.
+
+## Миграции
+
+Для production безопаснее использовать deploy-команду Prisma:
+
+```bash
+docker compose exec bot pnpm run prisma:deploy
+```
+
+Если вы меняете `schema.prisma`, порядок такой:
+
+1. Локально создать migration.
+2. Закоммитить `prisma/migrations`.
+3. На VPS выполнить `docker compose up -d --build`.
+
+## Резервные Копии
+
+Бэкап базы:
+
+```bash
+docker compose exec postgres pg_dump -U remna_user remna_bot > backup-$(date +%F-%H%M).sql
+```
+
+Восстановление:
+
+```bash
+cat backup.sql | docker compose exec -T postgres psql -U remna_user -d remna_bot
+```
+
+Практично хранить как минимум:
+
+- ежедневный dump БД
+- `.env` вне git
+- список последних рабочих коммитов
+
+## Remnawave Integration
+
+Что важно:
+
+- создание пользователя не ретраится автоматически, чтобы не плодить дубликаты при сетевой неопределенности
+- безопасные операции (`GET`, `DELETE`, `enable`, `disable`, `update expiry`) могут быть повторены ограниченно
+- 404 от Remnawave на проверке пользователя трактуется как отсутствие пользователя
+
+## Частые Операционные Команды
+
+Проверка контейнеров:
+
+```bash
+docker compose ps
+```
+
+Проверка последнего коммита:
+
+```bash
+git log -1 --oneline
+```
+
+Перезапуск только бота:
+
+```bash
+docker compose up -d --force-recreate bot
+```
+
+## Замечание По Секретам
+
+Если реальные токены когда-либо попадали в git, считайте их скомпрометированными:
+
+- перевыпустите Telegram bot token через `@BotFather`
+- создайте новый Remnawave API token
+- обновите `.env` на VPS

@@ -22,6 +22,7 @@ import {
 } from '../keyboards/admin.keyboards';
 import { backToMenuKeyboard, confirmationKeyboard, inlineKeyboard, saveKeyboard } from '../keyboards/common.keyboards';
 import { DealerTag } from '@prisma/client';
+import { BotProtectionService } from '../services/bot-protection.service';
 
 @Injectable()
 export class AdminHandler {
@@ -29,6 +30,7 @@ export class AdminHandler {
     private readonly dealersService: DealersService,
     private readonly accessHandler: BotAccessHandler,
     private readonly menuHandler: MenuHandler,
+    private readonly protectionService: BotProtectionService,
   ) {}
 
   async handleText(ctx: BotContext): Promise<boolean> {
@@ -117,7 +119,11 @@ export class AdminHandler {
       return;
     }
 
-    await this.dealersService.addDealer(dto, access.telegramId);
+    await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `admin:add-dealer:${dto.telegramId}`,
+      () => this.dealersService.addDealer(dto, access.telegramId),
+    );
     clearFlow(ctx);
 
     await renderMessage(
@@ -155,7 +161,11 @@ export class AdminHandler {
       return;
     }
 
-    await this.dealersService.deleteDealer(BigInt(telegramId), access.telegramId);
+    await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `admin:delete-dealer:${telegramId}`,
+      () => this.dealersService.deleteDealer(BigInt(telegramId), access.telegramId),
+    );
     clearFlow(ctx);
 
     await renderMessage(
@@ -216,7 +226,11 @@ export class AdminHandler {
       return;
     }
 
-    await this.dealersService.setActive(BigInt(telegramId), active, access.telegramId);
+    await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `admin:toggle-dealer:${telegramId}:${active ? 'on' : 'off'}`,
+      () => this.dealersService.setActive(BigInt(telegramId), active, access.telegramId),
+    );
     await this.showDealerCard(ctx, telegramId);
   }
 
@@ -330,10 +344,14 @@ export class AdminHandler {
       return;
     }
 
-    await this.dealersService.setTag(
-      BigInt(flow.data.telegramId),
-      flow.data.tag,
-      access.telegramId,
+    await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `admin:set-tag:${flow.data.telegramId}:${flow.data.tag}`,
+      () => this.dealersService.setTag(
+        BigInt(flow.data.telegramId!),
+        flow.data.tag!,
+        access.telegramId,
+      ),
     );
     clearFlow(ctx);
 
@@ -390,10 +408,14 @@ export class AdminHandler {
       return;
     }
 
-    await this.dealersService.setKeyLimit(
-      BigInt(flow.data.telegramId),
-      flow.data.keyLimit,
-      access.telegramId,
+    await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `admin:set-limit:${flow.data.telegramId}:${flow.data.keyLimit}`,
+      () => this.dealersService.setKeyLimit(
+        BigInt(flow.data.telegramId!),
+        flow.data.keyLimit!,
+        access.telegramId,
+      ),
     );
     clearFlow(ctx);
 
@@ -450,10 +472,14 @@ export class AdminHandler {
       return;
     }
 
-    await this.dealersService.setExpiresAt(
-      BigInt(flow.data.telegramId),
-      new Date(flow.data.expiresAtIso),
-      access.telegramId,
+    await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `admin:set-expiration:${flow.data.telegramId}:${flow.data.expiresAtIso}`,
+      () => this.dealersService.setExpiresAt(
+        BigInt(flow.data.telegramId!),
+        new Date(flow.data.expiresAtIso!),
+        access.telegramId,
+      ),
     );
     clearFlow(ctx);
 

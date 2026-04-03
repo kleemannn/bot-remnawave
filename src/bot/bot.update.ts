@@ -7,6 +7,10 @@ import { SubscriptionsHandler } from './handlers/subscriptions.handler';
 import { AdminHandler } from './handlers/admin.handler';
 import { BotText } from './messages/bot-text';
 import { answerCallback, getMessageText } from './utils/context.util';
+import { BotProtectionService } from './services/bot-protection.service';
+import { InvalidCallbackDataException } from '../common/errors/app-exceptions';
+import { BotErrorMapperService } from '../common/errors/bot-error-mapper.service';
+import { AppLoggerService } from '../common/logger/app-logger.service';
 
 @Update()
 export class BotUpdate {
@@ -15,6 +19,9 @@ export class BotUpdate {
     private readonly dealerProfileHandler: DealerProfileHandler,
     private readonly subscriptionsHandler: SubscriptionsHandler,
     private readonly adminHandler: AdminHandler,
+    private readonly protectionService: BotProtectionService,
+    private readonly errorMapper: BotErrorMapperService,
+    private readonly logger: AppLoggerService,
   ) {}
 
   @Start()
@@ -170,7 +177,7 @@ export class BotUpdate {
       if (data.startsWith('dealer:create:days:')) {
         await this.subscriptionsHandler.selectCreateDays(
           ctx,
-          Number(data.split(':')[3]),
+          this.parsePageValue(this.getCallbackSegment(data, 3)),
         );
         return;
       }
@@ -178,7 +185,7 @@ export class BotUpdate {
       if (data.startsWith('dealer:create:link:')) {
         await this.subscriptionsHandler.showCreatedLink(
           ctx,
-          data.split(':')[3],
+          this.getCallbackSegment(data, 3),
         );
         return;
       }
@@ -197,7 +204,7 @@ export class BotUpdate {
       if (data.startsWith('subs:list:')) {
         await this.subscriptionsHandler.showSubscriptionsList(
           ctx,
-          Number(data.split(':')[2]),
+          this.parsePageValue(this.getCallbackSegment(data, 2)),
         );
         return;
       }
@@ -205,7 +212,7 @@ export class BotUpdate {
       if (data.startsWith('subs:search:list:')) {
         await this.subscriptionsHandler.showSearchResults(
           ctx,
-          Number(data.split(':')[3]),
+          this.parsePageValue(this.getCallbackSegment(data, 3)),
         );
         return;
       }
@@ -213,7 +220,7 @@ export class BotUpdate {
       if (data.startsWith('subs:card:')) {
         await this.subscriptionsHandler.showSubscriptionCard(
           ctx,
-          data.split(':')[2],
+          this.getCallbackSegment(data, 2),
         );
         return;
       }
@@ -221,7 +228,7 @@ export class BotUpdate {
       if (data.startsWith('subs:link:')) {
         await this.subscriptionsHandler.showSubscriptionLink(
           ctx,
-          data.split(':')[2],
+          this.getCallbackSegment(data, 2),
         );
         return;
       }
@@ -229,7 +236,7 @@ export class BotUpdate {
       if (data.startsWith('subs:pause:ask:')) {
         await this.subscriptionsHandler.askPauseConfirmation(
           ctx,
-          data.split(':')[3],
+          this.getCallbackSegment(data, 3),
         );
         return;
       }
@@ -237,7 +244,7 @@ export class BotUpdate {
       if (data.startsWith('subs:pause:confirm:')) {
         await this.subscriptionsHandler.confirmPause(
           ctx,
-          data.split(':')[3],
+          this.getCallbackSegment(data, 3),
         );
         return;
       }
@@ -245,7 +252,7 @@ export class BotUpdate {
       if (data.startsWith('subs:resume:ask:')) {
         await this.subscriptionsHandler.askResumeConfirmation(
           ctx,
-          data.split(':')[3],
+          this.getCallbackSegment(data, 3),
         );
         return;
       }
@@ -253,7 +260,7 @@ export class BotUpdate {
       if (data.startsWith('subs:resume:confirm:')) {
         await this.subscriptionsHandler.confirmResume(
           ctx,
-          data.split(':')[3],
+          this.getCallbackSegment(data, 3),
         );
         return;
       }
@@ -261,7 +268,7 @@ export class BotUpdate {
       if (data.startsWith('subs:delete:ask:')) {
         await this.subscriptionsHandler.askDeleteConfirmation(
           ctx,
-          data.split(':')[3],
+          this.getCallbackSegment(data, 3),
         );
         return;
       }
@@ -269,7 +276,7 @@ export class BotUpdate {
       if (data.startsWith('subs:delete:confirm:')) {
         await this.subscriptionsHandler.confirmDelete(
           ctx,
-          data.split(':')[3],
+          this.getCallbackSegment(data, 3),
         );
       }
     });
@@ -298,7 +305,7 @@ export class BotUpdate {
       if (data.startsWith('admin:delete:ask:')) {
         await this.adminHandler.askDeleteDealerConfirmation(
           ctx,
-          data.split(':')[3],
+          this.getCallbackSegment(data, 3),
         );
         return;
       }
@@ -306,24 +313,31 @@ export class BotUpdate {
       if (data.startsWith('admin:delete:confirm:')) {
         await this.adminHandler.confirmDeleteDealer(
           ctx,
-          data.split(':')[3],
+          this.getCallbackSegment(data, 3),
         );
         return;
       }
 
       if (data.startsWith('admin:dealers:')) {
-        await this.adminHandler.listDealers(ctx, Number(data.split(':')[2]));
+        await this.adminHandler.listDealers(
+          ctx,
+          this.parsePageValue(this.getCallbackSegment(data, 2)),
+        );
         return;
       }
 
       if (data.startsWith('admin:dealer:')) {
         if (data.startsWith('admin:dealer:active:')) {
-          const [, , , telegramId, active] = data.split(':');
+          const telegramId = this.getCallbackSegment(data, 3);
+          const active = this.getCallbackSegment(data, 4);
+          if (active !== 'on' && active !== 'off') {
+            throw new InvalidCallbackDataException();
+          }
           await this.adminHandler.toggleDealerActive(ctx, telegramId, active === 'on');
           return;
         }
 
-        await this.adminHandler.showDealerCard(ctx, data.split(':')[2]);
+        await this.adminHandler.showDealerCard(ctx, this.getCallbackSegment(data, 2));
         return;
       }
 
@@ -338,16 +352,18 @@ export class BotUpdate {
       }
 
       if (data.startsWith('admin:tag:start:')) {
-        await this.adminHandler.startChangeTagFlow(ctx, data.split(':')[3]);
+        await this.adminHandler.startChangeTagFlow(ctx, this.getCallbackSegment(data, 3));
         return;
       }
 
       if (data.startsWith('admin:tag:select:')) {
+        const tag = this.getCallbackSegment(data, 3);
+        if (tag !== 'PREMIUM' && tag !== 'STANDARD') {
+          throw new InvalidCallbackDataException();
+        }
         await this.adminHandler.selectTag(
           ctx,
-          data.split(':')[3] === 'PREMIUM'
-            ? DealerTag.PREMIUM
-            : DealerTag.STANDARD,
+          tag === 'PREMIUM' ? DealerTag.PREMIUM : DealerTag.STANDARD,
         );
         return;
       }
@@ -363,7 +379,7 @@ export class BotUpdate {
       }
 
       if (data.startsWith('admin:limit:start:')) {
-        await this.adminHandler.startChangeLimitFlow(ctx, data.split(':')[3]);
+        await this.adminHandler.startChangeLimitFlow(ctx, this.getCallbackSegment(data, 3));
         return;
       }
 
@@ -380,7 +396,7 @@ export class BotUpdate {
       if (data.startsWith('admin:expiration:start:')) {
         await this.adminHandler.startChangeExpirationFlow(
           ctx,
-          data.split(':')[3],
+          this.getCallbackSegment(data, 3),
         );
         return;
       }
@@ -437,12 +453,73 @@ export class BotUpdate {
 
   private async safeExecute(ctx: BotContext, action: () => Promise<void>) {
     try {
+      this.protectionService.enforceInboundRateLimit(
+        this.getActorId(ctx),
+        this.getEventKind(ctx),
+      );
       await this.subscriptionsHandler.cleanupShownLinkMessage(ctx);
       await action();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      const message = this.errorMapper.toUserMessage(error);
+      this.logger.errorEvent(
+        'bot_handler_error',
+        {
+          actorId: this.getActorId(ctx),
+          eventKind: this.getEventKind(ctx),
+          callbackData: this.getCallbackData(ctx) || undefined,
+          text: this.getSafeText(ctx),
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error.stack : undefined,
+        BotUpdate.name,
+      );
       await answerCallback(ctx);
       await ctx.reply(BotText.genericError(message));
     }
+  }
+
+  private getActorId(ctx: BotContext): string {
+    return String(ctx.from?.id ?? 'unknown');
+  }
+
+  private getEventKind(ctx: BotContext): 'text' | 'callback' | 'command' {
+    if (this.getCallbackData(ctx)) {
+      return 'callback';
+    }
+
+    const text = getMessageText(ctx);
+    if (text.startsWith('/')) {
+      return 'command';
+    }
+
+    return 'text';
+  }
+
+  private getSafeText(ctx: BotContext): string | undefined {
+    const text = getMessageText(ctx);
+    if (!text || text.startsWith('/')) {
+      return text || undefined;
+    }
+
+    return text.slice(0, 128);
+  }
+
+  private getCallbackSegment(data: string, index: number): string {
+    const value = data.split(':')[index];
+    if (!value) {
+      throw new InvalidCallbackDataException();
+    }
+
+    return value;
+  }
+
+  private parsePageValue(value: string): number {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      throw new InvalidCallbackDataException();
+    }
+
+    return parsed;
   }
 }

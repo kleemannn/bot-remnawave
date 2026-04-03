@@ -1,15 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Dealer, DealerTag } from '@prisma/client';
 import dayjs from 'dayjs';
+import { AuditService } from '../common/audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddDealerDto } from './dto/add-dealer.dto';
 
 @Injectable()
 export class DealersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   async addDealer(dto: AddDealerDto, actorId?: bigint): Promise<Dealer> {
     const expiresAt = dayjs().add(dto.accessDays, 'day').toDate();
+    const previous = await this.prisma.dealer.findUnique({
+      where: { telegramId: BigInt(dto.telegramId) },
+    });
 
     const dealer = await this.prisma.dealer.upsert({
       where: { telegramId: BigInt(dto.telegramId) },
@@ -29,7 +36,17 @@ export class DealersService {
       },
     });
 
-    await this.audit(actorId, 'DEALER_ADD', 'dealers', dealer.id, dto);
+    await this.auditService.record({
+      actorId,
+      actorRole: 'admin',
+      action: 'DEALER_ADD',
+      entity: 'dealers',
+      entityId: dealer.id,
+      success: true,
+      previousState: previous,
+      newState: dealer,
+      metadata: dto,
+    });
     return dealer;
   }
 
@@ -40,47 +57,102 @@ export class DealersService {
     }
 
     await this.prisma.dealer.delete({ where: { id: dealer.id } });
-    await this.audit(actorId, 'DEALER_DELETE', 'dealers', dealer.id, {
-      telegramId: telegramId.toString(),
+    await this.auditService.record({
+      actorId,
+      actorRole: 'admin',
+      action: 'DEALER_DELETE',
+      entity: 'dealers',
+      entityId: dealer.id,
+      success: true,
+      previousState: dealer,
+      newState: null,
+      metadata: {
+        telegramId: telegramId.toString(),
+      },
     });
   }
 
   async setActive(telegramId: bigint, active: boolean, actorId?: bigint): Promise<Dealer> {
+    const previous = await this.prisma.dealer.findUnique({ where: { telegramId } });
+    if (!previous) {
+      throw new NotFoundException('Дилер не найден');
+    }
+
     const dealer = await this.prisma.dealer.update({
       where: { telegramId },
       data: { isActive: active },
     });
 
-    await this.audit(actorId, active ? 'DEALER_ACTIVATE' : 'DEALER_DEACTIVATE', 'dealers', dealer.id, {
-      telegramId: telegramId.toString(),
+    await this.auditService.record({
+      actorId,
+      actorRole: 'admin',
+      action: active ? 'DEALER_ACTIVATE' : 'DEALER_DEACTIVATE',
+      entity: 'dealers',
+      entityId: dealer.id,
+      success: true,
+      previousState: previous,
+      newState: dealer,
+      metadata: {
+        telegramId: telegramId.toString(),
+      },
     });
 
     return dealer;
   }
 
   async setTag(telegramId: bigint, tag: DealerTag, actorId?: bigint): Promise<Dealer> {
+    const previous = await this.prisma.dealer.findUnique({ where: { telegramId } });
+    if (!previous) {
+      throw new NotFoundException('Дилер не найден');
+    }
+
     const dealer = await this.prisma.dealer.update({
       where: { telegramId },
       data: { tag },
     });
 
-    await this.audit(actorId, 'DEALER_SET_TAG', 'dealers', dealer.id, {
-      telegramId: telegramId.toString(),
-      tag,
+    await this.auditService.record({
+      actorId,
+      actorRole: 'admin',
+      action: 'DEALER_SET_TAG',
+      entity: 'dealers',
+      entityId: dealer.id,
+      success: true,
+      previousState: previous,
+      newState: dealer,
+      metadata: {
+        telegramId: telegramId.toString(),
+        tag,
+      },
     });
 
     return dealer;
   }
 
   async setKeyLimit(telegramId: bigint, keyLimit: number, actorId?: bigint): Promise<Dealer> {
+    const previous = await this.prisma.dealer.findUnique({ where: { telegramId } });
+    if (!previous) {
+      throw new NotFoundException('Дилер не найден');
+    }
+
     const dealer = await this.prisma.dealer.update({
       where: { telegramId },
       data: { keyLimit },
     });
 
-    await this.audit(actorId, 'DEALER_SET_LIMIT', 'dealers', dealer.id, {
-      telegramId: telegramId.toString(),
-      keyLimit,
+    await this.auditService.record({
+      actorId,
+      actorRole: 'admin',
+      action: 'DEALER_SET_LIMIT',
+      entity: 'dealers',
+      entityId: dealer.id,
+      success: true,
+      previousState: previous,
+      newState: dealer,
+      metadata: {
+        telegramId: telegramId.toString(),
+        keyLimit,
+      },
     });
 
     return dealer;
@@ -100,10 +172,20 @@ export class DealersService {
       data: { expiresAt },
     });
 
-    await this.audit(actorId, 'DEALER_EXTEND', 'dealers', dealer.id, {
-      telegramId: telegramId.toString(),
-      days,
-      expiresAt,
+    await this.auditService.record({
+      actorId,
+      actorRole: 'admin',
+      action: 'DEALER_EXTEND',
+      entity: 'dealers',
+      entityId: dealer.id,
+      success: true,
+      previousState: dealer,
+      newState: updated,
+      metadata: {
+        telegramId: telegramId.toString(),
+        days,
+        expiresAt,
+      },
     });
 
     return updated;
@@ -124,9 +206,19 @@ export class DealersService {
       data: { expiresAt },
     });
 
-    await this.audit(actorId, 'DEALER_SET_EXPIRATION', 'dealers', dealer.id, {
-      telegramId: telegramId.toString(),
-      expiresAt,
+    await this.auditService.record({
+      actorId,
+      actorRole: 'admin',
+      action: 'DEALER_SET_EXPIRATION',
+      entity: 'dealers',
+      entityId: dealer.id,
+      success: true,
+      previousState: dealer,
+      newState: updated,
+      metadata: {
+        telegramId: telegramId.toString(),
+        expiresAt,
+      },
     });
 
     return updated;
@@ -181,23 +273,5 @@ export class DealersService {
     ]);
 
     return { total, active, expired, premium, standard };
-  }
-
-  private async audit(
-    actorId: bigint | undefined,
-    action: string,
-    entity: string,
-    entityId: string,
-    metadata?: unknown,
-  ) {
-    await this.prisma.auditLog.create({
-      data: {
-        actorId,
-        action,
-        entity,
-        entityId,
-        metadata: metadata as object | undefined,
-      },
-    });
   }
 }

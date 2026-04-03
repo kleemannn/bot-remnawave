@@ -3,7 +3,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TelegrafModule } from 'nestjs-telegraf';
 import { session } from 'telegraf';
-import { AppController } from './app.controller';
 import configuration from './common/config/configuration';
 import { validateEnv } from './common/config/env.validation';
 import { AuthModule } from './auth/auth.module';
@@ -15,6 +14,9 @@ import { BotModule } from './bot/bot.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { LoggerModule } from './common/logger/logger.module';
 import { HappModule } from './happ/happ.module';
+import { HealthModule } from './health/health.module';
+import { ErrorsModule } from './common/errors/errors.module';
+import { AuditModule } from './common/audit/audit.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { HappModule } from './happ/happ.module';
       validate: validateEnv,
     }),
     LoggerModule,
+    ErrorsModule,
+    AuditModule,
     ScheduleModule.forRoot(),
     TelegrafModule.forRootAsync({
       inject: [ConfigService],
@@ -40,7 +44,7 @@ import { HappModule } from './happ/happ.module';
     HappModule,
     BotModule,
     NotificationsModule,
+    HealthModule,
   ],
-  controllers: [AppController],
 })
 export class AppModule {}
