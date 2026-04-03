@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios';
 import { HttpService } from '@nestjs/axios';
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -96,6 +97,33 @@ export class RemnawaveService {
     } catch (error) {
       this.logger.error('Remnawave updateUserExpiry failed', error);
       throw new InternalServerErrorException('Ошибка Remnawave API при обновлении срока подписки');
+    }
+  }
+
+  async userExists(remnawaveUserId: string): Promise<boolean> {
+    const baseUrl = this.configService.getOrThrow<string>('remnawave.baseUrl');
+    const token = this.configService.getOrThrow<string>('remnawave.token');
+
+    try {
+      await firstValueFrom(
+        this.httpService.get(`${baseUrl}/users/${remnawaveUserId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          timeout: this.configService.get<number>('remnawave.timeoutMs', 10000),
+        }),
+      );
+
+      return true;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        return false;
+      }
+
+      this.logger.error('Remnawave userExists failed', error);
+      throw new InternalServerErrorException(
+        'Ошибка Remnawave API при проверке пользователя',
+      );
     }
   }
 

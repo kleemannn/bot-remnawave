@@ -11,10 +11,22 @@ import { BotContext } from '../interfaces/bot-context.interface';
 import { BotText } from '../messages/bot-text';
 import { CreateSubscriptionDto } from '../../subscriptions/dto/create-subscription.dto';
 import { sanitizeUsername, parsePositiveInt } from '../utils/input.util';
-import { clearFlow, setFlow, setSubscriptionsView } from '../utils/session.util';
-import { renderMessage } from '../utils/context.util';
+import {
+  clearFlow,
+  clearFlowMessageId,
+  setFlow,
+  setFlowMessageId,
+  setSubscriptionsView,
+} from '../utils/session.util';
+import {
+  deleteMessageById,
+  getCurrentMessageId,
+  isCallbackContext,
+  renderMessage,
+} from '../utils/context.util';
 import {
   createSubscriptionConfirmKeyboard,
+  createSubscriptionDaysKeyboard,
   subscriptionActionSuccessKeyboard,
   subscriptionCardKeyboard,
   subscriptionsListKeyboard,
@@ -79,7 +91,7 @@ export class SubscriptionsHandler {
       data: {},
     });
 
-    await this.menuHandler.showFlowPrompt(ctx, BotText.askSubscriptionUsername());
+    await this.showCreatePrompt(ctx, BotText.askSubscriptionUsername());
   }
 
   async confirmCreate(ctx: BotContext) {
@@ -117,6 +129,7 @@ export class SubscriptionsHandler {
     const result = await this.subscriptionsService.createForDealer(access.telegramId, dto);
 
     clearFlow(ctx);
+    clearFlowMessageId(ctx);
 
     await renderMessage(
       ctx,
@@ -133,6 +146,12 @@ export class SubscriptionsHandler {
       }),
       dealerAfterCreateKeyboard(),
     );
+
+    const copyableLink = result.happEncryptedUrl ?? result.subscriptionUrl;
+    if (copyableLink) {
+      await ctx.reply('Скопируйте ключ сообщением ниже.');
+      await ctx.reply(copyableLink);
+    }
   }
 
   async startSearchFlow(ctx: BotContext) {
@@ -330,16 +349,56 @@ export class SubscriptionsHandler {
     );
   }
 
+  async selectCreateDays(ctx: BotContext, days: number) {
+    const flow = ctx.session.flow;
+    if (
+      !flow ||
+      flow.type !== BOT_FLOW.DEALER_CREATE_SUBSCRIPTION ||
+      flow.step !== 'days' ||
+      !flow.data.username
+    ) {
+      await this.menuHandler.showMainMenu(ctx, BotText.chooseMenuAction());
+      return;
+    }
+
+    const parsed = parsePositiveInt(String(days), 'Количество дней');
+    if (!parsed.ok || parsed.value === undefined) {
+      await renderMessage(
+        ctx,
+        parsed.error ?? 'Введите количество дней еще раз.',
+        createSubscriptionDaysKeyboard(),
+      );
+      return;
+    }
+
+    setFlow(ctx, {
+      type: BOT_FLOW.DEALER_CREATE_SUBSCRIPTION,
+      step: 'confirm',
+      data: {
+        username: flow.data.username,
+        days: parsed.value,
+      },
+    });
+
+    await renderMessage(
+      ctx,
+      BotText.confirmCreateSubscription(flow.data.username, parsed.value),
+      createSubscriptionConfirmKeyboard(),
+    );
+    this.rememberFlowMessageId(ctx, getCurrentMessageId(ctx));
+  }
+
   private async handleCreateSubscriptionText(
     ctx: BotContext,
     flow: DealerCreateSubscriptionFlow,
   ) {
     const text = (ctx.message as { text?: string }).text?.trim() ?? '';
+    await this.deleteCurrentUserMessage(ctx);
 
     if (flow.step === 'username') {
       const parsed = sanitizeUsername(text);
       if (!parsed.ok || !parsed.value) {
-        await this.menuHandler.showFlowPrompt(
+        await this.showCreatePrompt(
           ctx,
           parsed.error ?? 'Введите корректное имя пользователя.',
         );
@@ -354,16 +413,21 @@ export class SubscriptionsHandler {
         },
       });
 
-      await this.menuHandler.showFlowPrompt(ctx, BotText.askSubscriptionDays());
+      await this.showCreatePrompt(
+        ctx,
+        BotText.askSubscriptionDays(),
+        createSubscriptionDaysKeyboard(),
+      );
       return;
     }
 
     if (flow.step === 'days') {
       const parsed = parsePositiveInt(text, 'Количество дней');
       if (!parsed.ok || parsed.value === undefined) {
-        await this.menuHandler.showFlowPrompt(
+        await this.showCreatePrompt(
           ctx,
           parsed.error ?? 'Введите количество дней еще раз.',
+          createSubscriptionDaysKeyboard(),
         );
         return;
       }
@@ -377,7 +441,7 @@ export class SubscriptionsHandler {
         },
       });
 
-      await renderMessage(
+      await this.showCreatePrompt(
         ctx,
         BotText.confirmCreateSubscription(flow.data.username!, parsed.value),
         createSubscriptionConfirmKeyboard(),
@@ -385,7 +449,7 @@ export class SubscriptionsHandler {
       return;
     }
 
-    await this.menuHandler.showFlowPrompt(
+    await this.showCreatePrompt(
       ctx,
       'Проверьте данные и нажмите «Создать» или «Отмена».',
     );
@@ -438,5 +502,50 @@ export class SubscriptionsHandler {
       BotText.confirmSubscriptionAction(title, subscription, description),
       confirmationKeyboard(confirmData),
     );
+  }
+
+  private async showCreatePrompt(
+    ctx: BotContext,
+    text: string,
+    extra?: Record<string, unknown>,
+  ) {
+    if (!isCallbackContext(ctx)) {
+      await this.deleteActiveFlowMessage(ctx);
+    }
+
+    const messageId = await renderMessage(ctx, text, extra);
+    this.rememberFlowMessageId(ctx, messageId);
+  }
+
+  private rememberFlowMessageId(ctx: BotContext, messageId: number | null) {
+    if (typeof messageId === 'number') {
+      setFlowMessageId(ctx, messageId);
+      return;
+    }
+
+    clearFlowMessageId(ctx);
+  }
+
+  private async deleteActiveFlowMessage(ctx: BotContext) {
+    const messageId = ctx.session.flowMessageId;
+    if (typeof messageId !== 'number') {
+      return;
+    }
+
+    await deleteMessageById(ctx, messageId);
+    clearFlowMessageId(ctx);
+  }
+
+  private async deleteCurrentUserMessage(ctx: BotContext) {
+    if (isCallbackContext(ctx)) {
+      return;
+    }
+
+    const messageId = getCurrentMessageId(ctx);
+    if (typeof messageId !== 'number') {
+      return;
+    }
+
+    await deleteMessageById(ctx, messageId);
   }
 }

@@ -7,7 +7,11 @@ import { cancelKeyboard } from '../keyboards/common.keyboards';
 import { dealerMainMenuKeyboard } from '../keyboards/dealer.keyboards';
 import { BotContext } from '../interfaces/bot-context.interface';
 import { BotText } from '../messages/bot-text';
-import { clearFlow, clearPendingAction } from '../utils/session.util';
+import {
+  clearFlow,
+  clearFlowMessageId,
+  clearPendingAction,
+} from '../utils/session.util';
 import { renderMessage } from '../utils/context.util';
 import { BotAccessHandler } from './bot-access.handler';
 
@@ -17,6 +21,7 @@ export class MenuHandler {
 
   async showWelcome(ctx: BotContext) {
     clearFlow(ctx);
+    clearFlowMessageId(ctx);
     clearPendingAction(ctx);
 
     const access = await this.accessHandler.getAccess(ctx);
@@ -30,6 +35,7 @@ export class MenuHandler {
 
   async showMainMenu(ctx: BotContext, prefix?: string) {
     clearFlow(ctx);
+    clearFlowMessageId(ctx);
     clearPendingAction(ctx);
 
     const access = await this.accessHandler.getAccess(ctx);
@@ -51,6 +57,7 @@ export class MenuHandler {
     }
 
     clearFlow(ctx);
+    clearFlowMessageId(ctx);
     clearPendingAction(ctx);
 
     await renderMessage(ctx, BotText.adminMenuTitle(), adminMainMenuKeyboard());
@@ -63,6 +70,7 @@ export class MenuHandler {
     }
 
     clearFlow(ctx);
+    clearFlowMessageId(ctx);
     clearPendingAction(ctx);
 
     await renderMessage(
@@ -73,6 +81,10 @@ export class MenuHandler {
   }
 
   async showHelp(ctx: BotContext) {
+    clearFlow(ctx);
+    clearFlowMessageId(ctx);
+    clearPendingAction(ctx);
+
     const access = await this.accessHandler.getAccess(ctx);
     const text =
       access.isAdmin && access.dealer
@@ -90,6 +102,7 @@ export class MenuHandler {
 
   async cancelFlow(ctx: BotContext) {
     clearFlow(ctx);
+    clearFlowMessageId(ctx);
     clearPendingAction(ctx);
     await this.showMainMenu(ctx, BotText.canceled());
   }

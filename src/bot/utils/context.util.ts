@@ -16,6 +16,22 @@ export function isCallbackContext(ctx: BotContext): boolean {
   return Boolean((ctx as BotContext & { callbackQuery?: unknown }).callbackQuery);
 }
 
+export function getCurrentMessageId(ctx: BotContext): number | null {
+  const callbackMessage = (ctx as BotContext & {
+    callbackQuery?: { message?: { message_id?: number } };
+  }).callbackQuery?.message?.message_id;
+
+  if (typeof callbackMessage === 'number') {
+    return callbackMessage;
+  }
+
+  const messageId = (ctx as BotContext & {
+    message?: { message_id?: number };
+  }).message?.message_id;
+
+  return typeof messageId === 'number' ? messageId : null;
+}
+
 export async function answerCallback(ctx: BotContext, text?: string) {
   if (!isCallbackContext(ctx)) {
     return;
@@ -28,11 +44,19 @@ export async function answerCallback(ctx: BotContext, text?: string) {
   await result?.catch(() => undefined);
 }
 
+export async function deleteMessageById(ctx: BotContext, messageId: number) {
+  await (ctx as BotContext & {
+    deleteMessage?: (messageId?: number) => Promise<unknown>;
+  })
+    .deleteMessage?.(messageId)
+    ?.catch(() => undefined);
+}
+
 export async function renderMessage(
   ctx: BotContext,
   text: string,
   extra?: Record<string, unknown>,
-) {
+): Promise<number | null> {
   await answerCallback(ctx);
 
   if (isCallbackContext(ctx)) {
@@ -43,11 +67,12 @@ export async function renderMessage(
           extra?: Record<string, unknown>,
         ) => Promise<unknown>;
       }).editMessageText(text, extra);
-      return;
+      return getCurrentMessageId(ctx);
     } catch {
       // Ignore edit failures and fall back to a new message.
     }
   }
 
-  await ctx.reply(text, extra as any);
+  const sentMessage = await ctx.reply(text, extra as any);
+  return (sentMessage as { message_id?: number }).message_id ?? null;
 }

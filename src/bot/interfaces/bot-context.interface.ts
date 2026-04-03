@@ -8,6 +8,7 @@ import {
 
 export interface BotSession {
   flow?: BotFlow;
+  flowMessageId?: number;
   pendingAction?: PendingAction;
   subscriptionsView?: SubscriptionsViewState;
   dealersView?: DealersViewState;

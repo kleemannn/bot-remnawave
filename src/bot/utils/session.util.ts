@@ -14,6 +14,14 @@ export function setFlow(ctx: BotContext, flow: BotFlow) {
   ensureSession(ctx).flow = flow;
 }
 
+export function clearFlowMessageId(ctx: BotContext) {
+  ensureSession(ctx).flowMessageId = undefined;
+}
+
+export function setFlowMessageId(ctx: BotContext, messageId: number) {
+  ensureSession(ctx).flowMessageId = messageId;
+}
+
 export function setSubscriptionsView(ctx: BotContext, view: SubscriptionsViewState) {
   ensureSession(ctx).subscriptionsView = view;
 }

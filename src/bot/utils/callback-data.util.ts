@@ -6,6 +6,7 @@ export const callbackData = {
   dealerProfile: 'dealer:profile',
   dealerCreateStart: 'dealer:create:start',
   dealerCreateConfirm: 'dealer:create:confirm',
+  dealerCreateDays: (days: number) => `dealer:create:days:${days}`,
   dealerSearchStart: 'dealer:search:start',
   subscriptionsList: (page = 1) => `subs:list:${page}`,
   subscriptionsSearchResults: (page = 1) => `subs:search:list:${page}`,

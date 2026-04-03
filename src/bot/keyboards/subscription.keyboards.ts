@@ -19,6 +19,16 @@ export function createSubscriptionConfirmKeyboard() {
   ]);
 }
 
+export function createSubscriptionDaysKeyboard() {
+  return inlineKeyboard([
+    [
+      { text: '7 дней', callback_data: callbackData.dealerCreateDays(7) },
+      { text: '30 дней', callback_data: callbackData.dealerCreateDays(30) },
+    ],
+    [{ text: '❌ Отмена', callback_data: callbackData.cancelFlow }],
+  ]);
+}
+
 export function subscriptionsListKeyboard(
   items: SubscriptionListItem[],
   page: number,

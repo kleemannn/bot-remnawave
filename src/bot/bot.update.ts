@@ -167,6 +167,14 @@ export class BotUpdate {
         return;
       }
 
+      if (data.startsWith('dealer:create:days:')) {
+        await this.subscriptionsHandler.selectCreateDays(
+          ctx,
+          Number(data.split(':')[3]),
+        );
+        return;
+      }
+
       if (data === 'dealer:search:start') {
         await this.subscriptionsHandler.startSearchFlow(ctx);
       }

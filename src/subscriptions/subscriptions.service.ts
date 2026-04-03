@@ -125,6 +125,8 @@ export class SubscriptionsService {
       throw new NotFoundException('Дилер не найден');
     }
 
+    await this.syncDeletedSubscriptionsForDealer(dealer.id);
+
     return this.prisma.subscription.findMany({
       where: { dealerId: dealer.id, status: { not: SubscriptionStatus.DELETED } },
       include: { dealerUser: true },
@@ -138,6 +140,8 @@ export class SubscriptionsService {
     pageSize = 5,
   ) {
     const dealer = await this.getDealerOrThrow(dealerTelegramId);
+    await this.syncDeletedSubscriptionsForDealer(dealer.id);
+
     const where = {
       dealerId: dealer.id,
       status: { not: SubscriptionStatus.DELETED },
@@ -170,6 +174,8 @@ export class SubscriptionsService {
     pageSize = 5,
   ) {
     const dealer = await this.getDealerOrThrow(dealerTelegramId);
+    await this.syncDeletedSubscriptionsForDealer(dealer.id);
+
     const where = {
       dealerId: dealer.id,
       status: { not: SubscriptionStatus.DELETED },
@@ -359,6 +365,7 @@ export class SubscriptionsService {
       where: {
         id: subscriptionId,
         dealerId: dealer.id,
+        status: { not: SubscriptionStatus.DELETED },
       },
       include: { dealerUser: true },
     });
@@ -367,6 +374,77 @@ export class SubscriptionsService {
       throw new NotFoundException('Подписка не найдена');
     }
 
+    const exists = await this.syncSubscriptionWithRemnawave(
+      subscription.id,
+      subscription.remnawaveUserId,
+    );
+    if (!exists) {
+      throw new NotFoundException(
+        'Подписка уже удалена в панели Remnawave. Список обновлен.',
+      );
+    }
+
     return subscription;
+  }
+
+  private async syncDeletedSubscriptionsForDealer(dealerId: string): Promise<void> {
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: {
+        dealerId,
+        status: { not: SubscriptionStatus.DELETED },
+      },
+      select: {
+        id: true,
+        remnawaveUserId: true,
+      },
+    });
+
+    if (subscriptions.length === 0) {
+      return;
+    }
+
+    const removedIds = (
+      await Promise.all(
+        subscriptions.map(async (subscription) => ({
+          id: subscription.id,
+          exists: await this.remnawaveService.userExists(subscription.remnawaveUserId),
+        })),
+      )
+    )
+      .filter((subscription) => !subscription.exists)
+      .map((subscription) => subscription.id);
+
+    if (removedIds.length === 0) {
+      return;
+    }
+
+    await this.prisma.subscription.updateMany({
+      where: {
+        id: { in: removedIds },
+        status: { not: SubscriptionStatus.DELETED },
+      },
+      data: {
+        status: SubscriptionStatus.DELETED,
+      },
+    });
+  }
+
+  private async syncSubscriptionWithRemnawave(
+    subscriptionId: string,
+    remnawaveUserId: string,
+  ): Promise<boolean> {
+    const exists = await this.remnawaveService.userExists(remnawaveUserId);
+    if (exists) {
+      return true;
+    }
+
+    await this.prisma.subscription.update({
+      where: { id: subscriptionId },
+      data: {
+        status: SubscriptionStatus.DELETED,
+      },
+    });
+
+    return false;
   }
 }
