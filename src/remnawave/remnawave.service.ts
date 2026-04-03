@@ -1,4 +1,3 @@
-import { isAxiosError } from 'axios';
 import { HttpService } from '@nestjs/axios';
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -116,7 +115,7 @@ export class RemnawaveService {
 
       return true;
     } catch (error) {
-      if (isAxiosError(error) && error.response?.status === 404) {
+      if (this.getErrorStatus(error) === 404) {
         return false;
       }
 
@@ -125,6 +124,15 @@ export class RemnawaveService {
         'Ошибка Remnawave API при проверке пользователя',
       );
     }
+  }
+
+  private getErrorStatus(error: unknown): number | undefined {
+    if (!error || typeof error !== 'object') {
+      return undefined;
+    }
+
+    const response = (error as { response?: { status?: unknown } }).response;
+    return typeof response?.status === 'number' ? response.status : undefined;
   }
 
   private async postWithoutResult(path: string, operation: string): Promise<void> {
