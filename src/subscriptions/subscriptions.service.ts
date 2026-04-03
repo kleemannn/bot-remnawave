@@ -126,6 +126,22 @@ export class SubscriptionsService {
     };
   }
 
+  async isUsernameTaken(username: string): Promise<boolean> {
+    const total = await this.prisma.subscription.count({
+      where: {
+        status: { not: SubscriptionStatus.DELETED },
+        dealerUser: {
+          username: {
+            equals: username,
+            mode: 'insensitive',
+          },
+        },
+      },
+    });
+
+    return total > 0;
+  }
+
   async listByDealer(dealerTelegramId: bigint) {
     const dealer = await this.dealersService.getDealerByTelegramId(dealerTelegramId);
     if (!dealer) {

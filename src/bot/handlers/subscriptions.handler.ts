@@ -468,6 +468,15 @@ export class SubscriptionsHandler {
         return;
       }
 
+      const isTaken = await this.subscriptionsService.isUsernameTaken(parsed.value);
+      if (isTaken) {
+        await this.showCreatePrompt(
+          ctx,
+          'Пользователь уже существует. Введите другое имя.',
+        );
+        return;
+      }
+
       setFlow(ctx, {
         type: BOT_FLOW.DEALER_CREATE_SUBSCRIPTION,
         step: 'days',
