@@ -317,6 +317,13 @@ export const BotText = {
     ]);
   },
 
+  deleteDealersList(page: number, pageCount: number) {
+    return renderCard('🗑 Удаление дилера', [
+      cardLine('📄', 'Страница', `${page} из ${pageCount}`),
+      'Выберите дилера из списка ниже.',
+    ]);
+  },
+
   stats(stats: {
     total: number;
     active: number;

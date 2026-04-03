@@ -6,11 +6,20 @@ import { DealerProfileHandler } from './handlers/dealer-profile.handler';
 import { SubscriptionsHandler } from './handlers/subscriptions.handler';
 import { AdminHandler } from './handlers/admin.handler';
 import { BotText } from './messages/bot-text';
-import { answerCallback, getMessageText } from './utils/context.util';
+import {
+  answerCallback,
+  deleteMessageById,
+  getMessageText,
+} from './utils/context.util';
 import { BotProtectionService } from './services/bot-protection.service';
 import { InvalidCallbackDataException } from '../common/errors/app-exceptions';
 import { BotErrorMapperService } from '../common/errors/bot-error-mapper.service';
 import { AppLoggerService } from '../common/logger/app-logger.service';
+import {
+  clearTransientErrorMessageId,
+  getTransientErrorMessageId,
+  setTransientErrorMessageId,
+} from './utils/session.util';
 
 @Update()
 export class BotUpdate {
@@ -318,6 +327,14 @@ export class BotUpdate {
         return;
       }
 
+      if (data.startsWith('admin:delete:list:')) {
+        await this.adminHandler.listDealersForDeletion(
+          ctx,
+          this.parsePageValue(this.getCallbackSegment(data, 3)),
+        );
+        return;
+      }
+
       if (data.startsWith('admin:dealers:')) {
         await this.adminHandler.listDealers(
           ctx,
@@ -457,6 +474,7 @@ export class BotUpdate {
         this.getActorId(ctx),
         this.getEventKind(ctx),
       );
+      await this.cleanupTransientErrorMessage(ctx);
       await this.subscriptionsHandler.cleanupShownLinkMessage(ctx);
       await action();
     } catch (error) {
@@ -475,8 +493,23 @@ export class BotUpdate {
         BotUpdate.name,
       );
       await answerCallback(ctx);
-      await ctx.reply(BotText.genericError(message));
+      await this.cleanupTransientErrorMessage(ctx);
+      const sentMessage = await ctx.reply(BotText.genericError(message));
+      const messageId = (sentMessage as { message_id?: number }).message_id;
+      if (typeof messageId === 'number') {
+        setTransientErrorMessageId(ctx, messageId);
+      }
     }
+  }
+
+  private async cleanupTransientErrorMessage(ctx: BotContext) {
+    const messageId = getTransientErrorMessageId(ctx);
+    if (typeof messageId !== 'number') {
+      return;
+    }
+
+    await deleteMessageById(ctx, messageId);
+    clearTransientErrorMessageId(ctx);
   }
 
   private getActorId(ctx: BotContext): string {

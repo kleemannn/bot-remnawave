@@ -59,24 +59,62 @@ export function adminTagKeyboard() {
 }
 
 export function dealersListKeyboard(items: DealerListItem[], page: number, pageCount: number) {
+  return dealersSelectKeyboard(items, page, pageCount, 'view');
+}
+
+export function dealersDeleteListKeyboard(
+  items: DealerListItem[],
+  page: number,
+  pageCount: number,
+) {
+  return dealersSelectKeyboard(items, page, pageCount, 'delete');
+}
+
+function dealersSelectKeyboard(
+  items: DealerListItem[],
+  page: number,
+  pageCount: number,
+  mode: 'view' | 'delete',
+) {
   const rows: Button[][] = items.map((item) => [
     {
       text: `👨‍💼 ${item.username ?? 'Без username'} • ${formatDealerTagLabel(item.tag)}`,
-      callback_data: callbackData.adminDealerCard(item.telegramId.toString()),
+      callback_data:
+        mode === 'delete'
+          ? callbackData.adminDeleteDealerAsk(item.telegramId.toString())
+          : callbackData.adminDealerCard(item.telegramId.toString()),
     },
   ]);
 
   const paginationRow = buildPaginationRow({
     page,
     pageCount,
-    prevCallback: callbackData.adminDealersList(page - 1),
-    nextCallback: callbackData.adminDealersList(page + 1),
-    refreshCallback: callbackData.adminDealersList(page),
+    prevCallback:
+      mode === 'delete'
+        ? callbackData.adminDeleteDealersList(page - 1)
+        : callbackData.adminDealersList(page - 1),
+    nextCallback:
+      mode === 'delete'
+        ? callbackData.adminDeleteDealersList(page + 1)
+        : callbackData.adminDealersList(page + 1),
+    refreshCallback:
+      mode === 'delete'
+        ? callbackData.adminDeleteDealersList(page)
+        : callbackData.adminDealersList(page),
   });
   if (paginationRow.length > 0) {
     rows.push(paginationRow);
   }
 
+  rows.push([
+    {
+      text: '🔙 Назад',
+      callback_data:
+        mode === 'delete'
+          ? callbackData.adminManagementMenu
+          : callbackData.adminMenu,
+    },
+  ]);
   rows.push([{ text: '🔙 В меню', callback_data: callbackData.adminMenu }]);
 
   return inlineKeyboard(rows);

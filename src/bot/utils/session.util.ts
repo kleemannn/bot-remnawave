@@ -22,6 +22,18 @@ export function setFlowMessageId(ctx: BotContext, messageId: number) {
   ensureSession(ctx).flowMessageId = messageId;
 }
 
+export function setTransientErrorMessageId(ctx: BotContext, messageId: number) {
+  ensureSession(ctx).transientErrorMessageId = messageId;
+}
+
+export function getTransientErrorMessageId(ctx: BotContext): number | undefined {
+  return ensureSession(ctx).transientErrorMessageId;
+}
+
+export function clearTransientErrorMessageId(ctx: BotContext) {
+  ensureSession(ctx).transientErrorMessageId = undefined;
+}
+
 export function setCreatedSubscriptionLink(
   ctx: BotContext,
   subscriptionId: string,

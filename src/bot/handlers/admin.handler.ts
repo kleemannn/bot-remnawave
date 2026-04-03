@@ -11,11 +11,17 @@ import { callbackData } from '../utils/callback-data.util';
 import { formatDate } from '../utils/format.util';
 import { parseExpirationDate, parseNonNegativeInt, parsePositiveInt, parseTelegramId, sanitizeUsername } from '../utils/input.util';
 import { clearFlow, setDealersView, setFlow } from '../utils/session.util';
-import { renderMessage } from '../utils/context.util';
+import {
+  deleteMessageById,
+  getCurrentMessageId,
+  isCallbackContext,
+  renderMessage,
+} from '../utils/context.util';
 import { BotAccessHandler } from './bot-access.handler';
 import { MenuHandler } from './menu.handler';
 import {
   adminSuccessKeyboard,
+  dealersDeleteListKeyboard,
   adminTagKeyboard,
   dealerAdminCardKeyboard,
   dealersListKeyboard,
@@ -143,16 +149,8 @@ export class AdminHandler {
       return;
     }
 
-    setFlow(ctx, {
-      type: BOT_FLOW.ADMIN_DELETE_DEALER,
-      step: 'telegramId',
-      data: {},
-    });
-
-    await this.menuHandler.showFlowPrompt(
-      ctx,
-      BotText.askDealerTelegramId('удалить дилера'),
-    );
+    clearFlow(ctx);
+    await this.listDealersForDeletion(ctx, 1);
   }
 
   async confirmDeleteDealer(ctx: BotContext, telegramId: string) {
@@ -168,10 +166,10 @@ export class AdminHandler {
     );
     clearFlow(ctx);
 
-    await renderMessage(
+    await this.listDealersForDeletion(
       ctx,
-      BotText.success('Дилер удален.'),
-      adminSuccessKeyboard(),
+      ctx.session.dealersView?.page ?? 1,
+      BotText.success('Дилер удален. Выберите следующего из списка.'),
     );
   }
 
@@ -217,6 +215,45 @@ export class AdminHandler {
       ctx,
       BotText.dealerCard(dealer),
       dealerAdminCardKeyboard(dealer, ctx.session.dealersView?.page ?? 1),
+    );
+  }
+
+  async listDealersForDeletion(ctx: BotContext, page = 1, successMessage?: string) {
+    if (!(await this.accessHandler.ensureAdmin(ctx))) {
+      return;
+    }
+
+    const pageResult = await this.dealersService.listDealers(page, BOT_UI.DEALERS_PAGE_SIZE);
+    setDealersView(ctx, { page: pageResult.page });
+
+    if (pageResult.total === 0) {
+      await renderMessage(
+        ctx,
+        successMessage
+          ? `${successMessage}\n\n${BotText.emptyDealers()}`
+          : BotText.emptyDealers(),
+        inlineKeyboard([
+          [{ text: '➕ Добавить дилера', callback_data: callbackData.adminAddDealerStart }],
+          [{ text: '🔙 Назад', callback_data: callbackData.adminManagementMenu }],
+          [{ text: '🔙 В меню', callback_data: callbackData.adminMenu }],
+        ]),
+      );
+      return;
+    }
+
+    await renderMessage(
+      ctx,
+      successMessage
+        ? `${successMessage}\n\n${BotText.deleteDealersList(
+            pageResult.page,
+            pageResult.pageCount,
+          )}`
+        : BotText.deleteDealersList(pageResult.page, pageResult.pageCount),
+      dealersDeleteListKeyboard(
+        pageResult.items,
+        pageResult.page,
+        pageResult.pageCount,
+      ),
     );
   }
 
@@ -528,6 +565,7 @@ export class AdminHandler {
 
   private async handleAddDealerText(ctx: BotContext, flow: AdminAddDealerFlow) {
     const text = (ctx.message as { text?: string }).text?.trim() ?? '';
+    await this.deleteCurrentUserMessage(ctx);
 
     if (flow.step === 'telegramId') {
       const parsed = parseTelegramId(text);
@@ -628,6 +666,19 @@ export class AdminHandler {
       ctx,
       'Проверьте данные и нажмите «Сохранить» или «Отмена».',
     );
+  }
+
+  private async deleteCurrentUserMessage(ctx: BotContext) {
+    if (isCallbackContext(ctx)) {
+      return;
+    }
+
+    const messageId = getCurrentMessageId(ctx);
+    if (typeof messageId !== 'number') {
+      return;
+    }
+
+    await deleteMessageById(ctx, messageId);
   }
 
   private async handleDeleteDealerText(ctx: BotContext, _flow: AdminDeleteDealerFlow) {

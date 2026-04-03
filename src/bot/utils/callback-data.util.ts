@@ -26,6 +26,7 @@ export const callbackData = {
     `subs:delete:confirm:${subscriptionId}`,
   adminAddDealerStart: 'admin:add:start',
   adminDeleteDealerStart: 'admin:delete:start',
+  adminDeleteDealersList: (page = 1) => `admin:delete:list:${page}`,
   adminDealersList: (page = 1) => `admin:dealers:${page}`,
   adminDealerCard: (telegramId: string) => `admin:dealer:${telegramId}`,
   adminDealerToggleActive: (telegramId: string, active: 'on' | 'off') =>

@@ -11,8 +11,13 @@ import {
   clearFlow,
   clearFlowMessageId,
   clearPendingAction,
+  setFlowMessageId,
 } from '../utils/session.util';
-import { renderMessage } from '../utils/context.util';
+import {
+  deleteMessageById,
+  isCallbackContext,
+  renderMessage,
+} from '../utils/context.util';
 import { BotAccessHandler } from './bot-access.handler';
 
 @Injectable()
@@ -108,6 +113,30 @@ export class MenuHandler {
   }
 
   async showFlowPrompt(ctx: BotContext, text: string) {
-    await renderMessage(ctx, text, cancelKeyboard());
+    if (!isCallbackContext(ctx)) {
+      await this.deleteActiveFlowMessage(ctx);
+    }
+
+    const messageId = await renderMessage(ctx, text, cancelKeyboard());
+    this.rememberFlowMessageId(ctx, messageId);
+  }
+
+  private rememberFlowMessageId(ctx: BotContext, messageId: number | null) {
+    if (typeof messageId === 'number') {
+      setFlowMessageId(ctx, messageId);
+      return;
+    }
+
+    clearFlowMessageId(ctx);
+  }
+
+  private async deleteActiveFlowMessage(ctx: BotContext) {
+    const messageId = ctx.session.flowMessageId;
+    if (typeof messageId !== 'number') {
+      return;
+    }
+
+    await deleteMessageById(ctx, messageId);
+    clearFlowMessageId(ctx);
   }
 }
