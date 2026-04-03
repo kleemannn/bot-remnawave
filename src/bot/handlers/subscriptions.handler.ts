@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { DealersService } from '../../dealers/dealers.service';
 import { BOT_FLOW, DealerCreateSubscriptionFlow, DealerSearchSubscriptionFlow } from '../scenes/bot-scenes';
 import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
+import { BOT_UI } from '../constants/bot-ui.constants';
 import { BotAccessHandler } from './bot-access.handler';
 import { MenuHandler } from './menu.handler';
 import { BotContext } from '../interfaces/bot-context.interface';
@@ -25,6 +27,7 @@ import { dealerAfterCreateKeyboard } from '../keyboards/dealer.keyboards';
 export class SubscriptionsHandler {
   constructor(
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly dealersService: DealersService,
     private readonly accessHandler: BotAccessHandler,
     private readonly menuHandler: MenuHandler,
   ) {}
@@ -54,6 +57,19 @@ export class SubscriptionsHandler {
   async startCreateFlow(ctx: BotContext) {
     const access = await this.accessHandler.ensureDealer(ctx);
     if (!access) {
+      return;
+    }
+
+    const guard = this.dealersService.isDealerBlocked(access.dealer);
+    if (guard.blocked) {
+      await renderMessage(
+        ctx,
+        BotText.dealerBlocked(access.dealer, guard.reason ?? 'Создание недоступно.'),
+        inlineKeyboard([
+          [{ text: '👤 Профиль', callback_data: callbackData.dealerProfile }],
+          [{ text: '🔙 В меню', callback_data: callbackData.mainMenu }],
+        ]),
+      );
       return;
     }
 
@@ -106,6 +122,9 @@ export class SubscriptionsHandler {
       ctx,
       BotText.subscriptionCreated({
         id: result.subscription.id,
+        username: dto.username,
+        days: dto.days,
+        dealerTag: access.dealer.tag,
         expiresAt: result.subscription.expiresAt,
         happEncryptedUrl: result.happEncryptedUrl,
         subscriptionUrl: result.subscriptionUrl,
@@ -138,6 +157,7 @@ export class SubscriptionsHandler {
     const result = await this.subscriptionsService.listByDealerPaginated(
       access.telegramId,
       page,
+      BOT_UI.SUBSCRIPTIONS_PAGE_SIZE,
     );
 
     setSubscriptionsView(ctx, {
@@ -150,8 +170,8 @@ export class SubscriptionsHandler {
         ctx,
         BotText.emptySubscriptions(),
         inlineKeyboard([
-          [{ text: 'Создать подписку', callback_data: callbackData.dealerCreateStart }],
-          [{ text: 'Назад в меню', callback_data: callbackData.mainMenu }],
+          [{ text: '📦 Создать', callback_data: callbackData.dealerCreateStart }],
+          [{ text: '🔙 В меню', callback_data: callbackData.mainMenu }],
         ]),
       );
       return;
@@ -180,6 +200,7 @@ export class SubscriptionsHandler {
       access.telegramId,
       query,
       page,
+      BOT_UI.SUBSCRIPTIONS_PAGE_SIZE,
     );
 
     setSubscriptionsView(ctx, {
@@ -193,8 +214,8 @@ export class SubscriptionsHandler {
         ctx,
         BotText.noSearchResults(query),
         inlineKeyboard([
-          [{ text: 'Искать еще', callback_data: callbackData.dealerSearchStart }],
-          [{ text: 'Назад в меню', callback_data: callbackData.mainMenu }],
+          [{ text: '🔍 Повторить поиск', callback_data: callbackData.dealerSearchStart }],
+          [{ text: '🔙 Назад', callback_data: callbackData.subscriptionsList(1) }],
         ]),
       );
       return;
@@ -412,10 +433,7 @@ export class SubscriptionsHandler {
 
     await renderMessage(
       ctx,
-      BotText.confirmDangerousAction(
-        title,
-        `Имя: ${subscription.dealerUser.username}\n${description}`,
-      ),
+      BotText.confirmSubscriptionAction(title, subscription, description),
       confirmationKeyboard(confirmData),
     );
   }

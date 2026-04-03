@@ -138,6 +138,11 @@ export class BotUpdate {
 
       if (data === 'menu:admin') {
         await this.menuHandler.showAdminMenu(ctx);
+        return;
+      }
+
+      if (data === 'menu:admin:management') {
+        await this.menuHandler.showAdminManagementMenu(ctx);
       }
     });
   }
@@ -288,6 +293,12 @@ export class BotUpdate {
       }
 
       if (data.startsWith('admin:dealer:')) {
+        if (data.startsWith('admin:dealer:active:')) {
+          const [, , , telegramId, active] = data.split(':');
+          await this.adminHandler.toggleDealerActive(ctx, telegramId, active === 'on');
+          return;
+        }
+
         await this.adminHandler.showDealerCard(ctx, data.split(':')[2]);
         return;
       }

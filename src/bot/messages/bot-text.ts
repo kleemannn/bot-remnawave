@@ -1,18 +1,24 @@
-import { Dealer, SubscriptionStatus } from '@prisma/client';
+import { Dealer, DealerTag, SubscriptionStatus } from '@prisma/client';
+import { cardLine, cardNote, renderCard } from '../formatters/card.formatter';
+import {
+  formatDealerStatusLabel,
+  formatDealerTagLabel,
+  formatSubscriptionStatusLabel,
+  getDealerWarning,
+  getSubscriptionWarning,
+} from '../formatters/status.formatter';
 import {
   formatDate,
   formatDaysFromSeconds,
   formatDaysLeft,
-  formatDealerStatus,
-  formatDealerTag,
   formatRemainingKeys,
-  formatSubscriptionStatus,
   formatUsername,
 } from '../utils/format.util';
 
 interface SubscriptionCardData {
   id: string;
   status: SubscriptionStatus;
+  createdAt: Date;
   expiresAt: Date;
   remainingSeconds?: number | null;
   dealerUser: {
@@ -21,87 +27,145 @@ interface SubscriptionCardData {
   dealer: {
     telegramId: bigint;
     username: string | null;
+    tag: DealerTag;
   };
 }
 
 export const BotText = {
   welcome(isAdmin: boolean, isDealer: boolean) {
-    if (isAdmin && isDealer) {
-      return 'Добро пожаловать. Я помогу управлять подписками и дилерами шаг за шагом.';
+    const lines = ['Добро пожаловать в панель управления Remnawave.'];
+
+    if (isDealer) {
+      lines.push('Здесь можно создавать ключи, искать подписки и быстро управлять ими.');
     }
 
     if (isAdmin) {
-      return 'Добро пожаловать. Я помогу управлять дилерами и быстро находить нужную информацию.';
+      lines.push('Админ-раздел поможет управлять дилерами и следить за статистикой.');
     }
 
-    return 'Здравствуйте. Я помогу создать подписку, найти ее и управлять вашими ключами без сложных команд.';
+    return renderCard('🏠 Главное меню', lines);
   },
 
   mainMenuTitle(isAdmin: boolean) {
-    return isAdmin ? 'Главное меню' : 'Выберите действие';
+    return isAdmin ? '🏠 Главное меню' : '🏠 Панель дилера';
   },
 
   adminMenuTitle() {
-    return 'Админ-меню';
+    return renderCard('⚙️ Админ-панель', [
+      'Быстрый доступ к дилерам, статистике и управлению.',
+      'Выберите нужный раздел ниже.',
+    ]);
   },
 
-  help() {
+  adminManagementTitle() {
+    return renderCard('⚙️ Управление дилерами', [
+      'Здесь собраны точечные действия по дилерам.',
+      'Выберите, что хотите изменить.',
+    ]);
+  },
+
+  dealerHelp() {
+    return renderCard('❓ Помощь дилеру', [
+      '📦 Создавайте подписки пошагово без длинных команд.',
+      '📋 Открывайте карточку подписки и управляйте ей кнопками.',
+      '🔍 Поиск показывает только ваши подписки.',
+      '✅ Активна, ⏸ На паузе, ⏳ Истекла, ❌ Удалена.',
+      '🔑 Остаток ключей = лимит минус количество созданных.',
+    ]);
+  },
+
+  adminHelp() {
+    return renderCard('❓ Помощь администратору', [
+      '👨‍💼 Раздел «Дилеры» открывает список и карточки дилеров.',
+      '➕ «Добавить дилера» создает нового дилера пошагово.',
+      '⚙️ «Управление» меняет тег, лимит и срок доступа.',
+      '📊 «Статистика» показывает текущую сводку по дилерам.',
+      '🏷 Standard и Premium используют разные дилерские тарифы.',
+    ]);
+  },
+
+  combinedHelp() {
     return [
-      'Я работаю как пошаговый помощник.',
-      'Выберите действие кнопкой ниже, а я спрошу только нужные данные.',
-      'Во время любого сценария можно нажать «Отмена».',
-    ].join('\n');
+      renderCard('❓ Помощь дилеру', [
+        '📦 Создавайте подписки пошагово без длинных команд.',
+        '📋 Открывайте карточку подписки и управляйте ей кнопками.',
+        '🔍 Поиск показывает только ваши подписки.',
+        '✅ Активна, ⏸ На паузе, ⏳ Истекла, ❌ Удалена.',
+        '🔑 Остаток ключей = лимит минус количество созданных.',
+      ]),
+      renderCard('❓ Помощь администратору', [
+        '👨‍💼 Раздел «Дилеры» открывает список и карточки дилеров.',
+        '➕ «Добавить дилера» создает нового дилера пошагово.',
+        '⚙️ «Управление» меняет тег, лимит и срок доступа.',
+        '📊 «Статистика» показывает текущую сводку по дилерам.',
+        '🏷 Standard и Premium используют разные дилерские тарифы.',
+      ]),
+    ].join('\n\n');
   },
 
   askSubscriptionUsername() {
-    return 'Введите имя пользователя для новой подписки.';
+    return renderCard('📦 Создание подписки', [
+      'Шаг 1 из 2',
+      'Введите имя пользователя без пробелов.',
+    ]);
   },
 
   askSubscriptionDays() {
-    return 'Введите количество дней для подписки.';
+    return renderCard('📦 Создание подписки', [
+      'Шаг 2 из 2',
+      'Введите срок подписки в днях.',
+    ]);
   },
 
   confirmCreateSubscription(username: string, days: number) {
-    return [
-      'Проверьте данные перед созданием:',
-      `Имя пользователя: ${username}`,
-      `Срок: ${days} дн.`,
-    ].join('\n');
+    return renderCard('📦 Подтвердите создание', [
+      cardLine('👤', 'Пользователь', username),
+      cardLine('📅', 'Срок', `${days} дн.`),
+      'Если все верно, нажмите «Создать».',
+    ]);
   },
 
   subscriptionCreated(result: {
     id: string;
+    username: string;
+    days: number;
+    dealerTag: DealerTag;
     expiresAt: Date;
     happEncryptedUrl?: string;
     subscriptionUrl?: string;
   }) {
-    const lines = [
-      'Подписка создана.',
-      `ID: ${result.id}`,
-      `Дата окончания: ${formatDate(result.expiresAt)}`,
-    ];
+    const footer: string[] = [];
 
     if (result.happEncryptedUrl) {
-      lines.push(`HAPP ссылка: ${result.happEncryptedUrl}`);
+      footer.push(`🔗 HAPP: ${result.happEncryptedUrl}`);
     } else if (result.subscriptionUrl) {
-      lines.push(`Ссылка подписки: ${result.subscriptionUrl}`);
+      footer.push(`🔗 Ссылка: ${result.subscriptionUrl}`);
     }
 
-    return lines.join('\n');
+    return renderCard(
+      '✅ Подписка создана',
+      [
+        cardLine('👤', 'Пользователь', result.username),
+        cardLine('📅', 'Срок', `${result.days} дн.`),
+        cardLine('🏷', 'Тариф дилера', formatDealerTagLabel(result.dealerTag)),
+        cardLine('📅', 'Действует до', formatDate(result.expiresAt)),
+      ],
+      footer,
+    );
   },
 
   emptySubscriptions() {
-    return 'Подписок пока нет.';
+    return renderCard('📋 Подписок пока нет', [
+      'У вас еще нет активных подписок.',
+      'Создайте первую подписку кнопкой ниже.',
+    ]);
   },
 
   subscriptionsList(page: number, pageCount: number, query?: string) {
-    const lines = [
-      query ? `Результаты поиска по имени: ${query}` : 'Ваши подписки',
-      `Страница ${page} из ${pageCount}`,
-      'Выберите подписку:',
-    ];
-
-    return lines.join('\n');
+    return renderCard(query ? '🔍 Результаты поиска' : '📋 Мои подписки', [
+      query ? cardLine('👤', 'Поиск', query) : 'Выберите подписку из списка ниже.',
+      cardLine('📄', 'Страница', `${page} из ${pageCount}`),
+    ]);
   },
 
   subscriptionCard(subscription: SubscriptionCardData) {
@@ -109,55 +173,90 @@ export const BotText = {
       subscription.status === SubscriptionStatus.PAUSED
         ? formatDaysFromSeconds(subscription.remainingSeconds)
         : formatDaysLeft(subscription.expiresAt);
+    const warning = getSubscriptionWarning(subscription);
 
-    return [
-      'Карточка подписки',
-      `Имя: ${subscription.dealerUser.username}`,
-      `Статус: ${formatSubscriptionStatus(subscription.status)}`,
-      `Дата окончания: ${formatDate(subscription.expiresAt)}`,
-      `Дней осталось: ${daysLeft}`,
-      `Кто создал: ${formatUsername(subscription.dealer.username)} (${subscription.dealer.telegramId.toString()})`,
-    ].join('\n');
+    return renderCard(
+      '📦 Карточка подписки',
+      [
+        cardLine('👤', 'Пользователь', subscription.dealerUser.username),
+        cardLine('📌', 'Статус', formatSubscriptionStatusLabel(subscription)),
+        cardLine('🗓', 'Создана', formatDate(subscription.createdAt)),
+        cardLine('📅', 'Действует до', formatDate(subscription.expiresAt)),
+        cardLine('⏳', 'Осталось дней', daysLeft),
+        cardLine('🏷', 'Тег дилера', formatDealerTagLabel(subscription.dealer.tag)),
+        cardLine(
+          '👨‍💼',
+          'Создал',
+          `${formatUsername(subscription.dealer.username)} (${subscription.dealer.telegramId.toString()})`,
+        ),
+      ],
+      warning ? [cardNote(warning), '🛠 Действия доступны кнопками ниже.'] : ['🛠 Действия доступны кнопками ниже.'],
+    );
   },
 
   askSearchUsername() {
-    return 'Введите username для поиска среди ваших подписок.';
+    return renderCard('🔍 Поиск подписки', [
+      'Введите username, чтобы найти ваши подписки.',
+    ]);
   },
 
   noSearchResults(username: string) {
-    return `По запросу «${username}» ничего не найдено. Попробуйте другое имя.`;
+    return renderCard('🔍 Ничего не найдено', [
+      cardLine('👤', 'Запрос', username),
+      'Попробуйте другое имя пользователя.',
+    ]);
   },
 
   dealerProfile(dealer: Dealer) {
-    return [
-      'Профиль дилера',
-      `Тег дилера: ${formatDealerTag(dealer.tag)}`,
-      `Доступ до: ${formatDate(dealer.expiresAt)}`,
-      `Лимит ключей: ${dealer.keyLimit}`,
-      `Создано ключей: ${dealer.createdCount}`,
-      `Осталось ключей: ${formatRemainingKeys(dealer)}`,
-      `Статус дилера: ${formatDealerStatus(dealer)}`,
-    ].join('\n');
+    const warning = getDealerWarning(dealer);
+
+    return renderCard(
+      '👤 Профиль дилера',
+      [
+        cardLine('🏷', 'Тег', formatDealerTagLabel(dealer.tag)),
+        cardLine('📌', 'Статус', formatDealerStatusLabel(dealer)),
+        cardLine('📅', 'Доступ до', formatDate(dealer.expiresAt)),
+        cardLine('🔑', 'Лимит ключей', String(dealer.keyLimit)),
+        cardLine('📦', 'Создано', String(dealer.createdCount)),
+        cardLine('✅', 'Осталось', formatRemainingKeys(dealer)),
+      ],
+      warning ? [cardNote(warning)] : undefined,
+    );
+  },
+
+  dealerBlocked(dealer: Dealer, reason: string) {
+    return renderCard('⚠️ Создание сейчас недоступно', [
+      cardLine('📌', 'Статус', formatDealerStatusLabel(dealer)),
+      cardLine('📅', 'Доступ до', formatDate(dealer.expiresAt)),
+      cardLine('🔑', 'Осталось ключей', formatRemainingKeys(dealer)),
+      '',
+      reason,
+    ]);
   },
 
   askDealerTelegramId(action: string) {
-    return `Введите Telegram ID дилера, чтобы ${action}.`;
+    return renderCard('👨‍💼 Данные дилера', [
+      `Введите Telegram ID, чтобы ${action}.`,
+    ]);
   },
 
   askDealerUsername() {
-    return 'Введите username дилера без @.';
+    return renderCard('➕ Добавление дилера', ['Введите username дилера без @.']);
   },
 
   askDealerAccessDays() {
-    return 'Введите срок доступа в днях.';
+    return renderCard('➕ Добавление дилера', ['Введите срок доступа в днях.']);
   },
 
   askDealerLimit() {
-    return 'Введите лимит ключей.';
+    return renderCard('⚙️ Изменение лимита', ['Введите лимит ключей.']);
   },
 
   askDealerExpiration() {
-    return 'Введите новую дату окончания. Формат: ДД.ММ.ГГГГ ЧЧ:ММ';
+    return renderCard('📅 Изменение срока доступа', [
+      'Введите новую дату окончания.',
+      'Формат: ДД.ММ.ГГГГ ЧЧ:ММ',
+    ]);
   },
 
   confirmAddDealer(data: {
@@ -167,28 +266,45 @@ export const BotText = {
     accessDays: number;
     keyLimit: number;
   }) {
-    return [
-      'Проверьте данные дилера:',
-      `Telegram ID: ${data.telegramId}`,
-      `Username: ${data.username}`,
-      `Тег: ${data.tag.toLowerCase()}`,
-      `Доступ: ${data.accessDays} дн.`,
-      `Лимит ключей: ${data.keyLimit}`,
-    ].join('\n');
+    return renderCard('➕ Подтвердите дилера', [
+      cardLine('🆔', 'Telegram ID', data.telegramId),
+      cardLine('👤', 'Username', data.username),
+      cardLine('🏷', 'Тег', data.tag.toLowerCase()),
+      cardLine('📅', 'Доступ', `${data.accessDays} дн.`),
+      cardLine('🔑', 'Лимит', String(data.keyLimit)),
+    ]);
   },
 
   dealerCard(dealer: Dealer) {
-    return [
-      'Карточка дилера',
-      `Telegram ID: ${dealer.telegramId.toString()}`,
-      `Username: ${formatUsername(dealer.username)}`,
-      `Тег: ${formatDealerTag(dealer.tag)}`,
-      `Статус: ${formatDealerStatus(dealer)}`,
-      `Доступ до: ${formatDate(dealer.expiresAt)}`,
-      `Лимит ключей: ${dealer.keyLimit}`,
-      `Создано ключей: ${dealer.createdCount}`,
-      `Осталось ключей: ${formatRemainingKeys(dealer)}`,
-    ].join('\n');
+    const warning = getDealerWarning(dealer);
+
+    return renderCard(
+      '👨‍💼 Карточка дилера',
+      [
+        cardLine('🆔', 'Telegram ID', dealer.telegramId.toString()),
+        cardLine('👤', 'Username', formatUsername(dealer.username)),
+        cardLine('🏷', 'Тег', formatDealerTagLabel(dealer.tag)),
+        cardLine('📌', 'Статус', formatDealerStatusLabel(dealer)),
+        cardLine('📅', 'Доступ до', formatDate(dealer.expiresAt)),
+        cardLine('🔑', 'Лимит', String(dealer.keyLimit)),
+        cardLine('📦', 'Создано', String(dealer.createdCount)),
+        cardLine('✅', 'Осталось', formatRemainingKeys(dealer)),
+      ],
+      warning ? [cardNote(warning), '🛠 Действия доступны кнопками ниже.'] : ['🛠 Действия доступны кнопками ниже.'],
+    );
+  },
+
+  emptyDealers() {
+    return renderCard('👨‍💼 Дилеров пока нет', [
+      'Добавьте первого дилера, чтобы начать работу.',
+    ]);
+  },
+
+  dealersList(page: number, pageCount: number) {
+    return renderCard('👨‍💼 Список дилеров', [
+      cardLine('📄', 'Страница', `${page} из ${pageCount}`),
+      'Выберите дилера для просмотра карточки.',
+    ]);
   },
 
   stats(stats: {
@@ -198,62 +314,82 @@ export const BotText = {
     premium: number;
     standard: number;
   }) {
-    return [
-      'Статистика дилеров',
-      `Всего: ${stats.total}`,
-      `Активных: ${stats.active}`,
-      `Истекших: ${stats.expired}`,
-      `Premium: ${stats.premium}`,
-      `Standard: ${stats.standard}`,
-    ].join('\n');
+    return renderCard('📊 Статистика дилеров', [
+      cardLine('👨‍💼', 'Всего', String(stats.total)),
+      cardLine('✅', 'Активных', String(stats.active)),
+      cardLine('⏳', 'Истекших', String(stats.expired)),
+      cardLine('🏷', 'Premium', String(stats.premium)),
+      cardLine('🏷', 'Standard', String(stats.standard)),
+    ]);
   },
 
-  confirmDangerousAction(title: string, description: string) {
-    return [title, description, '', 'Подтвердите действие.'].join('\n');
+  confirmSubscriptionAction(
+    title: string,
+    subscription: SubscriptionCardData,
+    dangerText: string,
+  ) {
+    return renderCard(`⚠️ ${title}`, [
+      cardLine('👤', 'Пользователь', subscription.dealerUser.username),
+      cardLine('📅', 'Действует до', formatDate(subscription.expiresAt)),
+      cardLine('📌', 'Статус', formatSubscriptionStatusLabel(subscription)),
+      '',
+      dangerText,
+    ]);
+  },
+
+  confirmDealerDeletion(dealer: Dealer) {
+    return renderCard('⚠️ Подтвердите удаление дилера', [
+      cardLine('🆔', 'Telegram ID', dealer.telegramId.toString()),
+      cardLine('👤', 'Username', formatUsername(dealer.username)),
+      cardLine('📌', 'Статус', formatDealerStatusLabel(dealer)),
+      '',
+      'После удаления действие нельзя отменить.',
+    ]);
   },
 
   success(text: string) {
-    return text;
+    return `✅ ${text}`;
   },
 
   canceled() {
-    return 'Действие отменено.';
+    return '❌ Действие отменено.';
   },
 
   askTagSelection() {
-    return 'Выберите новый тег дилера.';
+    return renderCard('🏷 Выбор тега', ['Выберите новый тег дилера.']);
   },
 
   confirmTagChange(telegramId: string, tag: string) {
-    return [
-      'Подтвердите изменение тега:',
-      `Telegram ID: ${telegramId}`,
-      `Новый тег: ${tag.toLowerCase()}`,
-    ].join('\n');
+    return renderCard('🏷 Подтвердите изменение тега', [
+      cardLine('🆔', 'Telegram ID', telegramId),
+      cardLine('🏷', 'Новый тег', tag.toLowerCase()),
+    ]);
   },
 
   confirmLimitChange(telegramId: string, limit: number) {
-    return [
-      'Подтвердите изменение лимита:',
-      `Telegram ID: ${telegramId}`,
-      `Новый лимит: ${limit}`,
-    ].join('\n');
+    return renderCard('🔑 Подтвердите изменение лимита', [
+      cardLine('🆔', 'Telegram ID', telegramId),
+      cardLine('🔑', 'Новый лимит', String(limit)),
+    ]);
   },
 
   confirmExpirationChange(telegramId: string, formattedDate: string) {
-    return [
-      'Подтвердите изменение срока доступа:',
-      `Telegram ID: ${telegramId}`,
-      `Новая дата: ${formattedDate}`,
-    ].join('\n');
+    return renderCard('📅 Подтвердите изменение срока', [
+      cardLine('🆔', 'Telegram ID', telegramId),
+      cardLine('📅', 'Новая дата', formattedDate),
+    ]);
   },
 
   notDealer() {
-    return 'У вас нет дилерского профиля.';
+    return renderCard('⚠️ Доступ ограничен', [
+      'У вас нет дилерского профиля.',
+    ]);
   },
 
   notAdmin() {
-    return 'Этот раздел доступен только администратору.';
+    return renderCard('⚠️ Доступ ограничен', [
+      'Этот раздел доступен только администратору.',
+    ]);
   },
 
   chooseMenuAction() {
@@ -261,6 +397,6 @@ export const BotText = {
   },
 
   genericError(message: string) {
-    return `Ошибка: ${message}`;
+    return renderCard('⚠️ Ошибка', [message]);
   },
 };

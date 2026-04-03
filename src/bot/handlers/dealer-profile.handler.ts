@@ -20,8 +20,11 @@ export class DealerProfileHandler {
       ctx,
       BotText.dealerProfile(access.dealer),
       inlineKeyboard([
-        [{ text: 'Мои подписки', callback_data: callbackData.subscriptionsList(1) }],
-        [{ text: 'Назад в меню', callback_data: callbackData.mainMenu }],
+        [
+          { text: '📋 Мои подписки', callback_data: callbackData.subscriptionsList(1) },
+          { text: '📦 Создать', callback_data: callbackData.dealerCreateStart },
+        ],
+        [{ text: '🔙 В меню', callback_data: callbackData.mainMenu }],
       ]),
     );
   }

@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { adminMainMenuKeyboard } from '../keyboards/admin.keyboards';
+import {
+  adminMainMenuKeyboard,
+  adminManagementKeyboard,
+} from '../keyboards/admin.keyboards';
 import { cancelKeyboard } from '../keyboards/common.keyboards';
 import { dealerMainMenuKeyboard } from '../keyboards/dealer.keyboards';
 import { BotContext } from '../interfaces/bot-context.interface';
@@ -20,7 +23,7 @@ export class MenuHandler {
 
     await renderMessage(
       ctx,
-      `${BotText.welcome(access.isAdmin, Boolean(access.dealer))}\n\n${BotText.mainMenuTitle(access.isAdmin)}`,
+      BotText.welcome(access.isAdmin, Boolean(access.dealer)),
       dealerMainMenuKeyboard(Boolean(access.dealer), access.isAdmin),
     );
   }
@@ -53,12 +56,34 @@ export class MenuHandler {
     await renderMessage(ctx, BotText.adminMenuTitle(), adminMainMenuKeyboard());
   }
 
-  async showHelp(ctx: BotContext) {
-    const access = await this.accessHandler.getAccess(ctx);
+  async showAdminManagementMenu(ctx: BotContext) {
+    const access = await this.accessHandler.ensureAdmin(ctx);
+    if (!access) {
+      return;
+    }
+
+    clearFlow(ctx);
+    clearPendingAction(ctx);
 
     await renderMessage(
       ctx,
-      BotText.help(),
+      BotText.adminManagementTitle(),
+      adminManagementKeyboard(),
+    );
+  }
+
+  async showHelp(ctx: BotContext) {
+    const access = await this.accessHandler.getAccess(ctx);
+    const text =
+      access.isAdmin && access.dealer
+        ? BotText.combinedHelp()
+        : access.isAdmin
+          ? BotText.adminHelp()
+          : BotText.dealerHelp();
+
+    await renderMessage(
+      ctx,
+      text,
       dealerMainMenuKeyboard(Boolean(access.dealer), access.isAdmin),
     );
   }

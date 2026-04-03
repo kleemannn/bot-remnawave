@@ -1,0 +1,5 @@
+export const BOT_UI = {
+  SUBSCRIPTIONS_PAGE_SIZE: 5,
+  DEALERS_PAGE_SIZE: 6,
+  EXPIRING_SOON_DAYS: 3,
+} as const;

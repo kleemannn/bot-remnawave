@@ -15,25 +15,25 @@ export function inlineKeyboard(rows: Button[][]): Record<string, unknown> {
 }
 
 export function cancelKeyboard() {
-  return inlineKeyboard([[{ text: 'Отмена', callback_data: callbackData.cancelFlow }]]);
+  return inlineKeyboard([[{ text: '❌ Отмена', callback_data: callbackData.cancelFlow }]]);
 }
 
 export function backToMenuKeyboard() {
   return inlineKeyboard([
-    [{ text: 'Назад в меню', callback_data: callbackData.mainMenu }],
+    [{ text: '🔙 В меню', callback_data: callbackData.mainMenu }],
   ]);
 }
 
 export function confirmationKeyboard(confirmData: string) {
   return inlineKeyboard([
-    row({ text: 'Подтвердить', callback_data: confirmData }),
-    row({ text: 'Отмена', callback_data: callbackData.cancelFlow }),
+    row({ text: '✅ Подтвердить', callback_data: confirmData }),
+    row({ text: '❌ Отмена', callback_data: callbackData.cancelFlow }),
   ]);
 }
 
 export function saveKeyboard(confirmData: string) {
   return inlineKeyboard([
-    row({ text: 'Сохранить', callback_data: confirmData }),
-    row({ text: 'Отмена', callback_data: callbackData.cancelFlow }),
+    row({ text: '✅ Сохранить', callback_data: confirmData }),
+    row({ text: '❌ Отмена', callback_data: callbackData.cancelFlow }),
   ]);
 }

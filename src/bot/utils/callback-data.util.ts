@@ -2,6 +2,7 @@ export const callbackData = {
   mainMenu: 'menu:main',
   help: 'menu:help',
   adminMenu: 'menu:admin',
+  adminManagementMenu: 'menu:admin:management',
   dealerProfile: 'dealer:profile',
   dealerCreateStart: 'dealer:create:start',
   dealerCreateConfirm: 'dealer:create:confirm',
@@ -24,6 +25,8 @@ export const callbackData = {
   adminDeleteDealerStart: 'admin:delete:start',
   adminDealersList: (page = 1) => `admin:dealers:${page}`,
   adminDealerCard: (telegramId: string) => `admin:dealer:${telegramId}`,
+  adminDealerToggleActive: (telegramId: string, active: 'on' | 'off') =>
+    `admin:dealer:active:${telegramId}:${active}`,
   adminDealerInfoStart: 'admin:info:start',
   adminChangeTagStart: 'admin:tag:start',
   adminChangeTagForDealer: (telegramId: string) => `admin:tag:start:${telegramId}`,

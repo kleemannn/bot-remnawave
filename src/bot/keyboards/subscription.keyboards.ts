@@ -1,5 +1,7 @@
 import { SubscriptionStatus } from '@prisma/client';
+import { buildPaginationRow } from '../pagination/pagination.util';
 import { callbackData } from '../utils/callback-data.util';
+import { formatSubscriptionStatusLabel } from '../formatters/status.formatter';
 import { Button, inlineKeyboard } from './common.keyboards';
 
 interface SubscriptionListItem {
@@ -12,8 +14,8 @@ interface SubscriptionListItem {
 
 export function createSubscriptionConfirmKeyboard() {
   return inlineKeyboard([
-    [{ text: 'Создать', callback_data: callbackData.dealerCreateConfirm }],
-    [{ text: 'Отмена', callback_data: callbackData.cancelFlow }],
+    [{ text: '✅ Создать', callback_data: callbackData.dealerCreateConfirm }],
+    [{ text: '❌ Отмена', callback_data: callbackData.cancelFlow }],
   ]);
 }
 
@@ -25,37 +27,33 @@ export function subscriptionsListKeyboard(
 ) {
   const rows: Button[][] = items.map((item) => [
     {
-      text: `${item.dealerUser.username} • ${statusChip(item.status)}`,
+      text: `👤 ${item.dealerUser.username} • ${statusChip(item.status)}`,
       callback_data: callbackData.subscriptionCard(item.id),
     },
   ]);
 
-  const paginationRow: Button[] = [];
-  if (page > 1) {
-    paginationRow.push({
-      text: '← Назад',
-      callback_data:
-        mode === 'search'
-          ? callbackData.subscriptionsSearchResults(page - 1)
-          : callbackData.subscriptionsList(page - 1),
-    });
-  }
-
-  if (page < pageCount) {
-    paginationRow.push({
-      text: 'Вперед →',
-      callback_data:
-        mode === 'search'
-          ? callbackData.subscriptionsSearchResults(page + 1)
-          : callbackData.subscriptionsList(page + 1),
-    });
-  }
+  const paginationRow = buildPaginationRow({
+    page,
+    pageCount,
+    prevCallback:
+      mode === 'search'
+        ? callbackData.subscriptionsSearchResults(page - 1)
+        : callbackData.subscriptionsList(page - 1),
+    nextCallback:
+      mode === 'search'
+        ? callbackData.subscriptionsSearchResults(page + 1)
+        : callbackData.subscriptionsList(page + 1),
+    refreshCallback:
+      mode === 'search'
+        ? callbackData.subscriptionsSearchResults(page)
+        : callbackData.subscriptionsList(page),
+  });
 
   if (paginationRow.length > 0) {
     rows.push(paginationRow);
   }
 
-  rows.push([{ text: 'Назад в меню', callback_data: callbackData.mainMenu }]);
+  rows.push([{ text: '🔙 В меню', callback_data: callbackData.mainMenu }]);
 
   return inlineKeyboard(rows);
 }
@@ -71,7 +69,7 @@ export function subscriptionCardKeyboard(
   if (status === SubscriptionStatus.ACTIVE) {
     rows.push([
       {
-        text: 'Пауза',
+        text: '⏸ Пауза',
         callback_data: callbackData.subscriptionPauseAsk(subscriptionId),
       },
     ]);
@@ -80,7 +78,7 @@ export function subscriptionCardKeyboard(
   if (status === SubscriptionStatus.PAUSED) {
     rows.push([
       {
-        text: 'Возобновить',
+        text: '▶️ Возобновить',
         callback_data: callbackData.subscriptionResumeAsk(subscriptionId),
       },
     ]);
@@ -89,7 +87,7 @@ export function subscriptionCardKeyboard(
   if (status !== SubscriptionStatus.DELETED) {
     rows.push([
       {
-        text: 'Удалить',
+        text: '🗑 Удалить',
         callback_data: callbackData.subscriptionDeleteAsk(subscriptionId),
       },
     ]);
@@ -97,14 +95,14 @@ export function subscriptionCardKeyboard(
 
   rows.push([
     {
-      text: 'Назад',
+      text: '🔙 Назад',
       callback_data:
         mode === 'search'
           ? callbackData.subscriptionsSearchResults(page)
           : callbackData.subscriptionsList(page),
     },
   ]);
-  rows.push([{ text: 'Назад в меню', callback_data: callbackData.mainMenu }]);
+  rows.push([{ text: '🔙 В меню', callback_data: callbackData.mainMenu }]);
 
   return inlineKeyboard(rows);
 }
@@ -113,26 +111,20 @@ export function subscriptionActionSuccessKeyboard(mode: 'all' | 'search', page: 
   return inlineKeyboard([
     [
       {
-        text: 'К списку',
+        text: '📋 К списку',
         callback_data:
           mode === 'search'
             ? callbackData.subscriptionsSearchResults(page)
             : callbackData.subscriptionsList(page),
       },
     ],
-    [{ text: 'Назад в меню', callback_data: callbackData.mainMenu }],
+    [{ text: '🔙 В меню', callback_data: callbackData.mainMenu }],
   ]);
 }
 
 function statusChip(status: SubscriptionStatus): string {
-  switch (status) {
-    case SubscriptionStatus.ACTIVE:
-      return 'Активна';
-    case SubscriptionStatus.PAUSED:
-      return 'Пауза';
-    case SubscriptionStatus.DELETED:
-      return 'Удалена';
-    default:
-      return status;
-  }
+  return formatSubscriptionStatusLabel({
+    status,
+    expiresAt: new Date(Date.now() + 60_000),
+  });
 }

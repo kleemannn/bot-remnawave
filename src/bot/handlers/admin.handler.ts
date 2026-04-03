@@ -3,6 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AddDealerDto } from '../../dealers/dto/add-dealer.dto';
 import { DealersService } from '../../dealers/dealers.service';
+import { BOT_UI } from '../constants/bot-ui.constants';
 import { BotContext } from '../interfaces/bot-context.interface';
 import { BotText } from '../messages/bot-text';
 import { BOT_FLOW, AdminAddDealerFlow, AdminChangeExpirationFlow, AdminChangeLimitFlow, AdminChangeTagFlow, AdminDealerInfoFlow, AdminDeleteDealerFlow } from '../scenes/bot-scenes';
@@ -67,6 +68,10 @@ export class AdminHandler {
     await this.menuHandler.showAdminMenu(ctx);
   }
 
+  async showManagementMenu(ctx: BotContext) {
+    await this.menuHandler.showAdminManagementMenu(ctx);
+  }
+
   async startAddDealerFlow(ctx: BotContext) {
     if (!(await this.accessHandler.ensureAdmin(ctx))) {
       return;
@@ -117,7 +122,7 @@ export class AdminHandler {
 
     await renderMessage(
       ctx,
-      BotText.success('Дилер успешно сохранен.'),
+      BotText.success('Дилер успешно добавлен.'),
       adminSuccessKeyboard(),
     );
   }
@@ -165,16 +170,16 @@ export class AdminHandler {
       return;
     }
 
-    const result = await this.dealersService.listDealers(page);
-    setDealersView(ctx, { page: result.page });
+    const pageResult = await this.dealersService.listDealers(page, BOT_UI.DEALERS_PAGE_SIZE);
+    setDealersView(ctx, { page: pageResult.page });
 
-    if (result.total === 0) {
+    if (pageResult.total === 0) {
       await renderMessage(
         ctx,
-        'Список дилеров пуст.',
+        BotText.emptyDealers(),
         inlineKeyboard([
-          [{ text: 'Добавить дилера', callback_data: callbackData.adminAddDealerStart }],
-          [{ text: 'Назад в меню', callback_data: callbackData.adminMenu }],
+          [{ text: '➕ Добавить дилера', callback_data: callbackData.adminAddDealerStart }],
+          [{ text: '🔙 В меню', callback_data: callbackData.adminMenu }],
         ]),
       );
       return;
@@ -182,8 +187,8 @@ export class AdminHandler {
 
     await renderMessage(
       ctx,
-      `Список дилеров\nСтраница ${result.page} из ${result.pageCount}`,
-      dealersListKeyboard(result.items, result.page, result.pageCount),
+      BotText.dealersList(pageResult.page, pageResult.pageCount),
+      dealersListKeyboard(pageResult.items, pageResult.page, pageResult.pageCount),
     );
   }
 
@@ -201,8 +206,18 @@ export class AdminHandler {
     await renderMessage(
       ctx,
       BotText.dealerCard(dealer),
-      dealerAdminCardKeyboard(telegramId),
+      dealerAdminCardKeyboard(dealer, ctx.session.dealersView?.page ?? 1),
     );
+  }
+
+  async toggleDealerActive(ctx: BotContext, telegramId: string, active: boolean) {
+    const access = await this.accessHandler.ensureAdmin(ctx);
+    if (!access) {
+      return;
+    }
+
+    await this.dealersService.setActive(BigInt(telegramId), active, access.telegramId);
+    await this.showDealerCard(ctx, telegramId);
   }
 
   async startDealerInfoFlow(ctx: BotContext) {
@@ -459,8 +474,8 @@ export class AdminHandler {
       ctx,
       BotText.stats(stats),
       inlineKeyboard([
-        [{ text: 'Список дилеров', callback_data: callbackData.adminDealersList(1) }],
-        [{ text: 'Назад в меню', callback_data: callbackData.adminMenu }],
+        [{ text: '👨‍💼 Дилеры', callback_data: callbackData.adminDealersList(1) }],
+        [{ text: '🔙 В меню', callback_data: callbackData.adminMenu }],
       ]),
     );
   }
@@ -480,10 +495,7 @@ export class AdminHandler {
 
     await renderMessage(
       ctx,
-      BotText.confirmDangerousAction(
-        'Удаление дилера',
-        `Telegram ID: ${telegramId}\nUsername: ${dealer.username ?? 'Не указан'}`,
-      ),
+      BotText.confirmDealerDeletion(dealer),
       confirmationKeyboard(callbackData.adminConfirmDeleteDealer(telegramId)),
     );
   }
