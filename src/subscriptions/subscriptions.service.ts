@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { DealerTag, SubscriptionStatus } from '@prisma/client';
 import dayjs from 'dayjs';
+import { buildRemnawaveOwnerTag } from '../common/utils/remnawave-owner-tag.util';
 import { DealersService } from '../dealers/dealers.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RemnawaveService } from '../remnawave/remnawave.service';
@@ -43,9 +44,11 @@ export class SubscriptionsService {
         : this.configService.getOrThrow<string>('remnawave.standardSquadId');
 
     const expiresAt = dayjs().add(dto.days, 'day').toDate();
+    const ownerTag = buildRemnawaveOwnerTag(dealer.username, dealer.telegramId);
     const remote = await this.remnawaveService.createUser({
       username: dto.username,
       squadId,
+      tag: ownerTag,
       expiresAt,
     });
 
@@ -92,6 +95,8 @@ export class SubscriptionsService {
           metadata: {
             username: dto.username,
             days: dto.days,
+            squadId,
+            ownerTag,
             remnawaveUserId: remote.userId,
           },
         },

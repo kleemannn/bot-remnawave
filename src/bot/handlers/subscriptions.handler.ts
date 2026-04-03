@@ -125,6 +125,8 @@ export class SubscriptionsHandler {
         username: dto.username,
         days: dto.days,
         dealerTag: access.dealer.tag,
+        dealerUsername: access.dealer.username,
+        dealerTelegramId: access.dealer.telegramId,
         expiresAt: result.subscription.expiresAt,
         happEncryptedUrl: result.happEncryptedUrl,
         subscriptionUrl: result.subscriptionUrl,

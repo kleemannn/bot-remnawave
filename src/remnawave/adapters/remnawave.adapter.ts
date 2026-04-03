@@ -7,7 +7,9 @@ export class RemnawaveAdapter {
   toCreateUserPayload(dto: CreateRemnawaveUserDto) {
     return {
       username: dto.username,
+      activeInternalSquads: [dto.squadId],
       squadId: dto.squadId,
+      ...(dto.tag ? { tag: dto.tag } : {}),
       expireAt: dto.expiresAt.toISOString(),
     };
   }

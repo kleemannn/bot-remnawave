@@ -1,4 +1,5 @@
 import { Dealer, DealerTag, SubscriptionStatus } from '@prisma/client';
+import { buildRemnawaveOwnerTag } from '../../common/utils/remnawave-owner-tag.util';
 import { cardLine, cardNote, renderCard } from '../formatters/card.formatter';
 import {
   formatDealerStatusLabel,
@@ -130,6 +131,8 @@ export const BotText = {
     username: string;
     days: number;
     dealerTag: DealerTag;
+    dealerUsername: string | null;
+    dealerTelegramId: bigint;
     expiresAt: Date;
     happEncryptedUrl?: string;
     subscriptionUrl?: string;
@@ -148,6 +151,11 @@ export const BotText = {
         cardLine('👤', 'Пользователь', result.username),
         cardLine('📅', 'Срок', `${result.days} дн.`),
         cardLine('🏷', 'Тариф дилера', formatDealerTagLabel(result.dealerTag)),
+        cardLine(
+          '🏷',
+          'Тег владельца',
+          buildRemnawaveOwnerTag(result.dealerUsername, result.dealerTelegramId),
+        ),
         cardLine('📅', 'Действует до', formatDate(result.expiresAt)),
       ],
       footer,
@@ -184,6 +192,14 @@ export const BotText = {
         cardLine('📅', 'Действует до', formatDate(subscription.expiresAt)),
         cardLine('⏳', 'Осталось дней', daysLeft),
         cardLine('🏷', 'Тег дилера', formatDealerTagLabel(subscription.dealer.tag)),
+        cardLine(
+          '🏷',
+          'Тег владельца',
+          buildRemnawaveOwnerTag(
+            subscription.dealer.username,
+            subscription.dealer.telegramId,
+          ),
+        ),
         cardLine(
           '👨‍💼',
           'Создал',
