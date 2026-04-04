@@ -128,16 +128,18 @@ export const BotText = {
   },
 
   askSubscriptionExpiration() {
-    return renderCard('📅 Изменение срока подписки', [
-      'Введите новую дату окончания подписки.',
-      'Формат: ДД.ММ.ГГГГ ЧЧ:ММ',
+    return renderCard('📅 Продление подписки', [
+      'Введите количество дней, например 15.',
+      'Или выберите быстрый вариант кнопкой ниже.',
+      'Перед сохранением бот покажет новую дату окончания.',
     ]);
   },
 
-  confirmSubscriptionExpirationChange(username: string, formattedDate: string) {
-    return renderCard('📅 Подтвердите новый срок', [
+  confirmSubscriptionExpirationChange(username: string, days: number, formattedDate: string) {
+    return renderCard('📅 Подтвердите продление', [
       cardLine('👤', 'Пользователь', username),
-      cardLine('📅', 'Новая дата', formattedDate),
+      cardLine('➕', 'Добавить', `${days} дн.`),
+      cardLine('📅', 'Новый срок', formattedDate),
       'Если все верно, нажмите «Сохранить».',
     ]);
   },

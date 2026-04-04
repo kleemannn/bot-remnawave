@@ -250,6 +250,15 @@ export class BotUpdate {
         return;
       }
 
+      if (data.startsWith('subs:expiration:days:')) {
+        await this.subscriptionsHandler.selectChangeExpirationDays(
+          ctx,
+          this.getCallbackSegment(data, 3),
+          this.parsePageValue(this.getCallbackSegment(data, 4)),
+        );
+        return;
+      }
+
       if (data.startsWith('subs:expiration:confirm:')) {
         await this.subscriptionsHandler.confirmChangeExpiration(
           ctx,

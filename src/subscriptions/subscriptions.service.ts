@@ -415,10 +415,10 @@ export class SubscriptionsService {
     return this.happCryptoService.encryptSubscriptionUrl(subscriptionUrl);
   }
 
-  async updateSubscriptionExpiresAt(
+  async extendSubscriptionByDays(
     dealerTelegramId: bigint,
     subscriptionId: string,
-    expiresAt: Date,
+    days: number,
   ) {
     const subscription = await this.getOwnedSubscriptionOrThrow(
       dealerTelegramId,
@@ -429,6 +429,9 @@ export class SubscriptionsService {
       expiresAt: subscription.expiresAt,
       remainingSeconds: subscription.remainingSeconds,
     };
+
+    const baseDate = subscription.expiresAt > new Date() ? subscription.expiresAt : new Date();
+    const expiresAt = dayjs(baseDate).add(days, 'day').toDate();
 
     await this.remnawaveService.updateUserExpiry(subscription.remnawaveUserId, expiresAt);
 
@@ -461,6 +464,7 @@ export class SubscriptionsService {
       },
       metadata: {
         username: updated.dealerUser.username,
+        days,
       },
     });
 
