@@ -84,6 +84,12 @@ export function subscriptionCardKeyboard(
         callback_data: callbackData.subscriptionLink(subscriptionId),
       },
     ]);
+    rows.push([
+      {
+        text: '📅 Изменить срок',
+        callback_data: callbackData.subscriptionChangeExpirationAsk(subscriptionId),
+      },
+    ]);
   }
 
   if (status === SubscriptionStatus.ACTIVE) {

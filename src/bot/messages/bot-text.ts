@@ -127,6 +127,29 @@ export const BotText = {
     ]);
   },
 
+  askSubscriptionExpiration() {
+    return renderCard('📅 Изменение срока подписки', [
+      'Введите новую дату окончания подписки.',
+      'Формат: ДД.ММ.ГГГГ ЧЧ:ММ',
+    ]);
+  },
+
+  confirmSubscriptionExpirationChange(username: string, formattedDate: string) {
+    return renderCard('📅 Подтвердите новый срок', [
+      cardLine('👤', 'Пользователь', username),
+      cardLine('📅', 'Новая дата', formattedDate),
+      'Если все верно, нажмите «Сохранить».',
+    ]);
+  },
+
+  subscriptionExpiredNotification(username: string, expiresAt: Date) {
+    return renderCard('⏰ Подписка истекла', [
+      cardLine('👤', 'Пользователь', username),
+      cardLine('📅', 'Дата окончания', formatDate(expiresAt)),
+      'Срок подписки закончился. Откройте карточку и добавьте дней.',
+    ]);
+  },
+
   subscriptionCreated(result: {
     id: string;
     username: string;

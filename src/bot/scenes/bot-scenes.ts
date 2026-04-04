@@ -1,6 +1,7 @@
 export const BOT_FLOW = {
   DEALER_CREATE_SUBSCRIPTION: 'dealer_create_subscription',
   DEALER_SEARCH_SUBSCRIPTION: 'dealer_search_subscription',
+  DEALER_CHANGE_SUBSCRIPTION_EXPIRATION: 'dealer_change_subscription_expiration',
   ADMIN_ADD_DEALER: 'admin_add_dealer',
   ADMIN_DELETE_DEALER: 'admin_delete_dealer',
   ADMIN_DEALER_INFO: 'admin_dealer_info',
@@ -25,6 +26,15 @@ export interface DealerSearchSubscriptionFlow {
   step: 'username';
   data: {
     username?: string;
+  };
+}
+
+export interface DealerChangeSubscriptionExpirationFlow {
+  type: typeof BOT_FLOW.DEALER_CHANGE_SUBSCRIPTION_EXPIRATION;
+  step: 'expiresAt' | 'confirm';
+  data: {
+    subscriptionId?: string;
+    expiresAtIso?: string;
   };
 }
 
@@ -86,6 +96,7 @@ export interface AdminChangeExpirationFlow {
 export type BotFlow =
   | DealerCreateSubscriptionFlow
   | DealerSearchSubscriptionFlow
+  | DealerChangeSubscriptionExpirationFlow
   | AdminAddDealerFlow
   | AdminDeleteDealerFlow
   | AdminDealerInfoFlow

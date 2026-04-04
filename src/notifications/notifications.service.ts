@@ -1,12 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { NotificationType } from '@prisma/client';
+import { NotificationType, SubscriptionStatus } from '@prisma/client';
 import dayjs from 'dayjs';
 import { InjectBot } from 'nestjs-telegraf';
 import { Telegraf } from 'telegraf';
 import { AuditService } from '../common/audit/audit.service';
 import { AppLoggerService } from '../common/logger/app-logger.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { callbackData } from '../bot/utils/callback-data.util';
+import { inlineKeyboard } from '../bot/keyboards/common.keyboards';
+import { BotText } from '../bot/messages/bot-text';
 
 @Injectable()
 export class NotificationsService {
@@ -127,6 +130,81 @@ export class NotificationsService {
       );
     } finally {
       this.isRunning = false;
+    }
+  }
+
+  @Cron('0 */10 * * * *')
+  async sendExpiredSubscriptionNotifications() {
+    const now = new Date();
+
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: {
+        status: SubscriptionStatus.ACTIVE,
+        expiresAt: { lte: now },
+      },
+      include: {
+        dealer: true,
+        dealerUser: true,
+      },
+    });
+
+    for (const subscription of subscriptions) {
+      const alreadySent = await this.prisma.auditLog.findFirst({
+        where: {
+          action: 'SUBSCRIPTION_EXPIRED_NOTICE',
+          entity: 'subscriptions',
+          entityId: subscription.id,
+          createdAt: {
+            gte: subscription.expiresAt,
+          },
+        },
+      });
+
+      if (alreadySent) {
+        continue;
+      }
+
+      try {
+        await this.bot.telegram.sendMessage(
+          Number(subscription.dealer.telegramId),
+          BotText.subscriptionExpiredNotification(
+            subscription.dealerUser.username,
+            subscription.expiresAt,
+          ),
+          inlineKeyboard([
+            [
+              {
+                text: '📦 Открыть подписку',
+                callback_data: callbackData.subscriptionCard(subscription.id),
+              },
+            ],
+          ]) as any,
+        );
+
+        await this.auditService.record({
+          action: 'SUBSCRIPTION_EXPIRED_NOTICE',
+          actorRole: 'system',
+          entity: 'subscriptions',
+          entityId: subscription.id,
+          actorId: null,
+          success: true,
+          metadata: {
+            dealerTelegramId: subscription.dealer.telegramId.toString(),
+            username: subscription.dealerUser.username,
+            expiresAt: subscription.expiresAt,
+          },
+        });
+      } catch (error) {
+        this.logger.errorEvent(
+          'subscription_expiry_notice_failed',
+          {
+            subscriptionId: subscription.id,
+            dealerTelegramId: subscription.dealer.telegramId.toString(),
+          },
+          error instanceof Error ? error.stack : undefined,
+          NotificationsService.name,
+        );
+      }
     }
   }
 }

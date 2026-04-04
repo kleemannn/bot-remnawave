@@ -242,6 +242,22 @@ export class BotUpdate {
         return;
       }
 
+      if (data.startsWith('subs:expiration:ask:')) {
+        await this.subscriptionsHandler.startChangeExpirationFlow(
+          ctx,
+          this.getCallbackSegment(data, 3),
+        );
+        return;
+      }
+
+      if (data.startsWith('subs:expiration:confirm:')) {
+        await this.subscriptionsHandler.confirmChangeExpiration(
+          ctx,
+          this.getCallbackSegment(data, 3),
+        );
+        return;
+      }
+
       if (data.startsWith('subs:pause:ask:')) {
         await this.subscriptionsHandler.askPauseConfirmation(
           ctx,

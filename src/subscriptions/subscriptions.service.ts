@@ -415,6 +415,58 @@ export class SubscriptionsService {
     return this.happCryptoService.encryptSubscriptionUrl(subscriptionUrl);
   }
 
+  async updateSubscriptionExpiresAt(
+    dealerTelegramId: bigint,
+    subscriptionId: string,
+    expiresAt: Date,
+  ) {
+    const subscription = await this.getOwnedSubscriptionOrThrow(
+      dealerTelegramId,
+      subscriptionId,
+    );
+    const previousState = {
+      status: subscription.status,
+      expiresAt: subscription.expiresAt,
+      remainingSeconds: subscription.remainingSeconds,
+    };
+
+    await this.remnawaveService.updateUserExpiry(subscription.remnawaveUserId, expiresAt);
+
+    const nextRemainingSeconds =
+      subscription.status === SubscriptionStatus.PAUSED
+        ? Math.max(dayjs(expiresAt).diff(dayjs(), 'second'), 0)
+        : null;
+
+    const updated = await this.prisma.subscription.update({
+      where: { id: subscription.id },
+      data: {
+        expiresAt,
+        remainingSeconds: nextRemainingSeconds,
+      },
+      include: { dealerUser: true, dealer: true },
+    });
+
+    await this.auditService.record({
+      actorId: dealerTelegramId,
+      actorRole: 'dealer',
+      action: 'SUBSCRIPTION_SET_EXPIRATION',
+      entity: 'subscriptions',
+      entityId: subscription.id,
+      success: true,
+      previousState,
+      newState: {
+        status: updated.status,
+        expiresAt: updated.expiresAt,
+        remainingSeconds: updated.remainingSeconds,
+      },
+      metadata: {
+        username: updated.dealerUser.username,
+      },
+    });
+
+    return updated;
+  }
+
   private async getDealerOrThrow(dealerTelegramId: bigint) {
     const dealer = await this.dealersService.getDealerByTelegramId(dealerTelegramId);
     if (!dealer) {

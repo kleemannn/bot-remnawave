@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { DealersService } from '../../dealers/dealers.service';
-import { BOT_FLOW, DealerCreateSubscriptionFlow, DealerSearchSubscriptionFlow } from '../scenes/bot-scenes';
+import {
+  BOT_FLOW,
+  DealerChangeSubscriptionExpirationFlow,
+  DealerCreateSubscriptionFlow,
+  DealerSearchSubscriptionFlow,
+} from '../scenes/bot-scenes';
 import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
 import { BOT_UI } from '../constants/bot-ui.constants';
 import { BotAccessHandler } from './bot-access.handler';
@@ -10,7 +15,12 @@ import { MenuHandler } from './menu.handler';
 import { BotContext } from '../interfaces/bot-context.interface';
 import { BotText } from '../messages/bot-text';
 import { CreateSubscriptionDto } from '../../subscriptions/dto/create-subscription.dto';
-import { sanitizeUsername, parsePositiveInt } from '../utils/input.util';
+import {
+  parseExpirationDate,
+  parsePositiveInt,
+  sanitizeUsername,
+} from '../utils/input.util';
+import { formatDate } from '../utils/format.util';
 import {
   clearFlow,
   clearFlowMessageId,
@@ -68,6 +78,14 @@ export class SubscriptionsHandler {
 
     if (flow.type === BOT_FLOW.DEALER_SEARCH_SUBSCRIPTION) {
       await this.handleSearchText(ctx, flow as DealerSearchSubscriptionFlow);
+      return true;
+    }
+
+    if (flow.type === BOT_FLOW.DEALER_CHANGE_SUBSCRIPTION_EXPIRATION) {
+      await this.handleChangeExpirationText(
+        ctx,
+        flow as DealerChangeSubscriptionExpirationFlow,
+      );
       return true;
     }
 
@@ -278,6 +296,66 @@ export class SubscriptionsHandler {
       ctx,
       BotText.subscriptionCard(subscription),
       subscriptionCardKeyboard(subscription.id, subscription.status, view.mode, view.page),
+    );
+  }
+
+  async startChangeExpirationFlow(ctx: BotContext, subscriptionId: string) {
+    const access = await this.accessHandler.ensureDealer(ctx);
+    if (!access) {
+      return;
+    }
+
+    await this.subscriptionsService.getSubscriptionForDealer(
+      access.telegramId,
+      subscriptionId,
+    );
+
+    setFlow(ctx, {
+      type: BOT_FLOW.DEALER_CHANGE_SUBSCRIPTION_EXPIRATION,
+      step: 'expiresAt',
+      data: { subscriptionId },
+    });
+
+    await this.showCreatePrompt(ctx, BotText.askSubscriptionExpiration());
+  }
+
+  async confirmChangeExpiration(ctx: BotContext, subscriptionId: string) {
+    const access = await this.accessHandler.ensureDealer(ctx);
+    if (!access) {
+      return;
+    }
+
+    const flow = ctx.session.flow;
+    if (
+      !flow ||
+      flow.type !== BOT_FLOW.DEALER_CHANGE_SUBSCRIPTION_EXPIRATION ||
+      flow.step !== 'confirm' ||
+      flow.data.subscriptionId !== subscriptionId ||
+      !flow.data.expiresAtIso
+    ) {
+      await this.showSubscriptionCard(ctx, subscriptionId);
+      return;
+    }
+
+    await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `subscription:expiration:${subscriptionId}:${flow.data.expiresAtIso}`,
+      () =>
+        this.subscriptionsService.updateSubscriptionExpiresAt(
+          access.telegramId,
+          subscriptionId,
+          new Date(flow.data.expiresAtIso!),
+        ),
+    );
+
+    clearFlow(ctx);
+    clearFlowMessageId(ctx);
+    const view = ctx.session.subscriptionsView ?? { mode: 'all' as const, page: 1 };
+
+    await renderMessage(
+      ctx,
+      BotText.success('Срок подписки обновлен.'),
+      subscriptionActionSuccessKeyboard(view.mode, view.page),
     );
   }
 
@@ -550,6 +628,58 @@ export class SubscriptionsHandler {
     });
 
     await this.showSearchResults(ctx, 1);
+  }
+
+  private async handleChangeExpirationText(
+    ctx: BotContext,
+    flow: DealerChangeSubscriptionExpirationFlow,
+  ) {
+    const text = (ctx.message as { text?: string }).text?.trim() ?? '';
+    await this.deleteCurrentUserMessage(ctx);
+
+    if (flow.step !== 'expiresAt' || !flow.data.subscriptionId) {
+      await this.menuHandler.showMainMenu(ctx, BotText.chooseMenuAction());
+      return;
+    }
+
+    const parsed = parseExpirationDate(text);
+    if (!parsed.ok || !parsed.value) {
+      await this.showCreatePrompt(
+        ctx,
+        parsed.error ?? 'Введите дату еще раз.',
+      );
+      return;
+    }
+
+    const access = await this.accessHandler.ensureDealer(ctx);
+    if (!access) {
+      return;
+    }
+
+    const subscription = await this.subscriptionsService.getSubscriptionForDealer(
+      access.telegramId,
+      flow.data.subscriptionId,
+    );
+
+    setFlow(ctx, {
+      type: BOT_FLOW.DEALER_CHANGE_SUBSCRIPTION_EXPIRATION,
+      step: 'confirm',
+      data: {
+        subscriptionId: flow.data.subscriptionId,
+        expiresAtIso: parsed.value.toISOString(),
+      },
+    });
+
+    await this.showCreatePrompt(
+      ctx,
+      BotText.confirmSubscriptionExpirationChange(
+        subscription.dealerUser.username,
+        formatDate(parsed.value),
+      ),
+      confirmationKeyboard(
+        callbackData.subscriptionChangeExpirationConfirm(flow.data.subscriptionId),
+      ),
+    );
   }
 
   private async askActionConfirmation(

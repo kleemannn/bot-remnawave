@@ -20,6 +20,10 @@ export const callbackData = {
     `subs:resume:ask:${subscriptionId}`,
   subscriptionResumeConfirm: (subscriptionId: string) =>
     `subs:resume:confirm:${subscriptionId}`,
+  subscriptionChangeExpirationAsk: (subscriptionId: string) =>
+    `subs:expiration:ask:${subscriptionId}`,
+  subscriptionChangeExpirationConfirm: (subscriptionId: string) =>
+    `subs:expiration:confirm:${subscriptionId}`,
   subscriptionDeleteAsk: (subscriptionId: string) =>
     `subs:delete:ask:${subscriptionId}`,
   subscriptionDeleteConfirm: (subscriptionId: string) =>
