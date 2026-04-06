@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Dealer, DealerTag } from '@prisma/client';
+import { Dealer, DealerTag, SubscriptionStatus } from '@prisma/client';
 import dayjs from 'dayjs';
 import { AuditService } from '../common/audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -225,7 +225,12 @@ export class DealersService {
   }
 
   async getDealerByTelegramId(telegramId: bigint): Promise<Dealer | null> {
-    return this.prisma.dealer.findUnique({ where: { telegramId } });
+    const dealer = await this.prisma.dealer.findUnique({ where: { telegramId } });
+    if (!dealer) {
+      return null;
+    }
+
+    return this.syncDealerCreatedCount(dealer);
   }
 
   async listDealers(page = 1, pageSize = 6) {
@@ -239,8 +244,12 @@ export class DealersService {
       take: pageSize,
     });
 
+    const syncedItems = await Promise.all(
+      items.map((dealer) => this.syncDealerCreatedCount(dealer)),
+    );
+
     return {
-      items,
+      items: syncedItems,
       total,
       page: currentPage,
       pageCount,
@@ -273,5 +282,23 @@ export class DealersService {
     ]);
 
     return { total, active, expired, premium, standard };
+  }
+
+  private async syncDealerCreatedCount(dealer: Dealer): Promise<Dealer> {
+    const actualCreatedCount = await this.prisma.subscription.count({
+      where: {
+        dealerId: dealer.id,
+        status: { not: SubscriptionStatus.DELETED },
+      },
+    });
+
+    if (dealer.createdCount === actualCreatedCount) {
+      return dealer;
+    }
+
+    return this.prisma.dealer.update({
+      where: { id: dealer.id },
+      data: { createdCount: actualCreatedCount },
+    });
   }
 }
