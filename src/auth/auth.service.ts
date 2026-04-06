@@ -2,12 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Dealer } from '@prisma/client';
 import { DealersService } from '../dealers/dealers.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly configService: ConfigService,
     private readonly dealersService: DealersService,
+    private readonly prisma: PrismaService,
   ) {}
 
   isAdmin(telegramId: bigint): boolean {
