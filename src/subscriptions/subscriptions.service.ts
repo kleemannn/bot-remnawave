@@ -256,12 +256,10 @@ export class SubscriptionsService {
 
     await this.remnawaveService.deleteUser(subscription.remnawaveUserId);
 
-    const updated = await this.prisma.subscription.update({
-      where: { id: subscription.id },
-      data: {
-        status: SubscriptionStatus.DELETED,
-      },
-    });
+    const updated = await this.markSubscriptionAsDeleted(
+      subscription.id,
+      subscription.dealerId,
+    );
 
     await this.auditService.record({
       actorId: dealerTelegramId,
@@ -520,6 +518,7 @@ export class SubscriptionsService {
       },
       select: {
         id: true,
+        dealerId: true,
         remnawaveUserId: true,
         status: true,
         expiresAt: true,
@@ -544,15 +543,7 @@ export class SubscriptionsService {
     await Promise.all(
       syncResults.map(async ({ subscription, remote }) => {
         if (!remote.exists) {
-          await this.prisma.subscription.updateMany({
-            where: {
-              id: subscription.id,
-              status: { not: SubscriptionStatus.DELETED },
-            },
-            data: {
-              status: SubscriptionStatus.DELETED,
-            },
-          });
+          await this.markSubscriptionAsDeleted(subscription.id, subscription.dealerId);
           return;
         }
 
@@ -593,12 +584,16 @@ export class SubscriptionsService {
   ): Promise<boolean> {
     const remote = await this.remnawaveService.getUserState(remnawaveUserId);
     if (!remote.exists) {
-      await this.prisma.subscription.update({
+      const current = await this.prisma.subscription.findUnique({
         where: { id: subscriptionId },
-        data: {
-          status: SubscriptionStatus.DELETED,
+        select: {
+          dealerId: true,
         },
       });
+
+      if (current) {
+        await this.markSubscriptionAsDeleted(subscriptionId, current.dealerId);
+      }
 
       return false;
     }
@@ -644,5 +639,57 @@ export class SubscriptionsService {
     });
 
     return true;
+  }
+
+  private async markSubscriptionAsDeleted(subscriptionId: string, dealerId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const current = await tx.subscription.findUnique({
+        where: { id: subscriptionId },
+        select: {
+          id: true,
+          status: true,
+          dealerId: true,
+          remnawaveUserId: true,
+          expiresAt: true,
+          pausedAt: true,
+          remainingSeconds: true,
+          days: true,
+          createdAt: true,
+          updatedAt: true,
+          dealerUserId: true,
+        },
+      });
+
+      if (!current) {
+        throw new NotFoundException('Подписка не найдена');
+      }
+
+      if (current.status === SubscriptionStatus.DELETED) {
+        return current;
+      }
+
+      const updated = await tx.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          status: SubscriptionStatus.DELETED,
+        },
+      });
+
+      const dealer = await tx.dealer.findUnique({
+        where: { id: dealerId },
+        select: { createdCount: true },
+      });
+
+      if (dealer && dealer.createdCount > 0) {
+        await tx.dealer.update({
+          where: { id: dealerId },
+          data: {
+            createdCount: { decrement: 1 },
+          },
+        });
+      }
+
+      return updated;
+    });
   }
 }
