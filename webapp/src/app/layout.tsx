@@ -24,6 +24,34 @@ export default function RootLayout({
         <Script id="miniapp-debug-overlay" strategy="beforeInteractive">
           {`
             (function () {
+              function setLoaderText(title, subtitle, debugLines) {
+                try {
+                  var titleEl = document.getElementById('miniapp-loader-title');
+                  var subtitleEl = document.getElementById('miniapp-loader-subtitle');
+                  var debugEl = document.getElementById('miniapp-loader-debug');
+
+                  if (titleEl && title) {
+                    titleEl.textContent = title;
+                  }
+
+                  if (subtitleEl && subtitle) {
+                    subtitleEl.textContent = subtitle;
+                  }
+
+                  if (debugEl && debugLines && debugLines.length) {
+                    debugEl.classList.remove('hidden');
+                    debugEl.innerHTML = debugLines
+                      .map(function (line) {
+                        return '<p>' + String(line)
+                          .replace(/&/g, '&amp;')
+                          .replace(/</g, '&lt;')
+                          .replace(/>/g, '&gt;') + '</p>';
+                      })
+                      .join('');
+                  }
+                } catch (_) {}
+              }
+
               function showDebug(message) {
                 try {
                   var existing = document.getElementById('__miniapp_debug_overlay__');
@@ -77,6 +105,68 @@ export default function RootLayout({
               window.__miniappDebug = {
                 show: showDebug,
               };
+
+              function probe() {
+                try {
+                  var webApp = window.Telegram && window.Telegram.WebApp;
+                  var initData = webApp && typeof webApp.initData === 'string' ? webApp.initData : '';
+                  setLoaderText(
+                    'Открываем панель…',
+                    'Подключаем Telegram и загружаем ваши данные.',
+                    [
+                      'inline script: ok',
+                      'document.readyState: ' + document.readyState,
+                      'Telegram SDK: ' + (webApp ? 'есть' : 'нет'),
+                      'initData length: ' + initData.length,
+                      'location: ' + window.location.pathname + window.location.search,
+                    ],
+                  );
+
+                  if (!window.__miniappAuthProbeStarted && initData) {
+                    window.__miniappAuthProbeStarted = true;
+                    fetch('/webapp/auth', {
+                      method: 'POST',
+                      headers: {
+                        'content-type': 'application/json'
+                      },
+                      body: JSON.stringify({ initData: initData })
+                    })
+                      .then(function (response) {
+                        setLoaderText(
+                          'Проверяем авторизацию…',
+                          'Mini App получил ответ от сервера.',
+                          [
+                            'inline script: ok',
+                            'Telegram SDK: ' + (webApp ? 'есть' : 'нет'),
+                            'initData length: ' + initData.length,
+                            'auth status: ' + response.status,
+                          ],
+                        );
+                      })
+                      .catch(function (error) {
+                        setLoaderText(
+                          'Ошибка запроса авторизации',
+                          'Не удалось обратиться к /webapp/auth.',
+                          [
+                            'inline script: ok',
+                            'Telegram SDK: ' + (webApp ? 'есть' : 'нет'),
+                            'initData length: ' + initData.length,
+                            'auth error: ' + (error && error.message ? error.message : 'unknown'),
+                          ],
+                        );
+                      });
+                  }
+                } catch (error) {
+                  showDebug('probe error\\n' + (error && error.message ? error.message : String(error)));
+                }
+              }
+
+              document.addEventListener('DOMContentLoaded', function () {
+                probe();
+                setTimeout(probe, 500);
+                setTimeout(probe, 1500);
+                setTimeout(probe, 3000);
+              });
             })();
           `}
         </Script>

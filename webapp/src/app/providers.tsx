@@ -133,16 +133,28 @@ export function Providers({ children }: PropsWithChildren) {
       <div className="mx-auto flex min-h-screen w-full max-w-[480px] items-center justify-center px-6 text-center">
         <div className="space-y-3">
           <div className="mx-auto h-14 w-14 animate-pulse rounded-full bg-tg-muted" />
-          <p className="text-base font-medium text-tg-text">Открываем панель…</p>
-          <p className="text-sm text-tg-hint">Подключаем Telegram и загружаем ваши данные.</p>
+          <p id="miniapp-loader-title" className="text-base font-medium text-tg-text">
+            Открываем панель…
+          </p>
+          <p id="miniapp-loader-subtitle" className="text-sm text-tg-hint">
+            Подключаем Telegram и загружаем ваши данные.
+          </p>
           {authDebug.visible ? (
-            <div className="rounded-2xl bg-tg-card p-4 text-left text-xs leading-5 text-tg-hint shadow-card">
+            <div
+              id="miniapp-loader-debug"
+              className="rounded-2xl bg-tg-card p-4 text-left text-xs leading-5 text-tg-hint shadow-card"
+            >
               <p>Диагностика загрузки:</p>
               <p>Telegram SDK: {authDebug.hasTelegram ? 'есть' : 'нет'}</p>
               <p>initData length: {authDebug.initDataLength}</p>
               <p>document.readyState: {authDebug.readyState}</p>
             </div>
-          ) : null}
+          ) : (
+            <div
+              id="miniapp-loader-debug"
+              className="hidden rounded-2xl bg-tg-card p-4 text-left text-xs leading-5 text-tg-hint shadow-card"
+            />
+          )}
         </div>
       </div>
     );
