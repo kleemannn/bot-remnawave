@@ -225,12 +225,7 @@ export class DealersService {
   }
 
   async getDealerByTelegramId(telegramId: bigint): Promise<Dealer | null> {
-    const dealer = await this.prisma.dealer.findUnique({ where: { telegramId } });
-    if (!dealer) {
-      return null;
-    }
-
-    return this.syncDealerCreatedCount(dealer);
+    return this.prisma.dealer.findUnique({ where: { telegramId } });
   }
 
   async listDealers(page = 1, pageSize = 6) {

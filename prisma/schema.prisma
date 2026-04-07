@@ -121,3 +121,13 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+model TelegramSession {
+  key       String   @id @map("key")
+  data      Json     @map("data")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([updatedAt])
+  @@map("telegram_sessions")
+}
