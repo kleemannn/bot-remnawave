@@ -25,8 +25,12 @@ export function Providers({ children }: PropsWithChildren) {
   }, [pathname]);
 
   useEffect(() => {
-    applyTelegramTheme();
-    expandTelegramWebApp();
+    const timer = window.setTimeout(() => {
+      applyTelegramTheme();
+      expandTelegramWebApp();
+    }, 50);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
