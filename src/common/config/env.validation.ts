@@ -115,26 +115,6 @@ class EnvironmentVariables {
   @Min(1000)
   @Max(30000)
   HEALTHCHECK_DB_TIMEOUT_MS?: number;
-
-  @IsString()
-  @IsNotEmpty()
-  WEBAPP_JWT_SECRET!: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(300)
-  @Max(604800)
-  WEBAPP_JWT_TTL_SEC?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(60)
-  @Max(86400)
-  WEBAPP_INIT_DATA_TTL_SEC?: number;
-
-  @IsOptional()
-  @IsString()
-  WEBAPP_ALLOWED_ORIGINS?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

@@ -1,6 +1,6 @@
 # Remnawave Dealer Bot
 
-Telegram dealer bot for Remnawave on NestJS, Telegraf, Prisma and PostgreSQL. В репозитории также есть Telegram Mini App фронтенд для дилерской панели. Проект рассчитан на один VPS и один compose-стек без лишней инфраструктуры.
+Telegram dealer bot for Remnawave on NestJS, Telegraf, Prisma and PostgreSQL. Проект рассчитан на один VPS и один compose-стек без лишней инфраструктуры.
 
 ## Что уже есть
 
@@ -62,10 +62,6 @@ cp .env.example .env
 Полезные production-переменные:
 
 - `APP_LOG_LEVEL=log`
-- `WEBAPP_JWT_SECRET=...`
-- `WEBAPP_JWT_TTL_SEC=43200`
-- `WEBAPP_INIT_DATA_TTL_SEC=3600`
-- `WEBAPP_ALLOWED_ORIGINS=https://miniapp.example.com`
 - `REMNAWAVE_TIMEOUT_MS=10000`
 - `REMNAWAVE_RETRY_COUNT=1`
 - `REMNAWAVE_RETRY_DELAY_MS=500`
@@ -88,8 +84,9 @@ docker network create remnawave-network
 
 ```bash
 git pull
-docker compose up -d --build
-docker compose logs -f
+docker compose build --no-cache bot
+docker compose up -d --force-recreate bot
+docker compose logs -f bot
 ```
 
 Первый запуск всей пачки:
@@ -98,54 +95,21 @@ docker compose logs -f
 docker compose up -d --build
 ```
 
-Что поднимется:
-
-- `postgres`
-- `bot`
-- `webapp`
-- `nginx`
-
-Порты на VPS:
-
-- `127.0.0.1:3010` — gateway для Mini App и backend API
-- `127.0.0.1:3011` — прямой backend доступ для диагностики
-
 ## Health И Runtime Проверки
 
-Gateway слушает `127.0.0.1:3010` на хосте.
+Приложение слушает `127.0.0.1:3011` на хосте.
 
 Проверки:
 
 ```bash
-curl http://127.0.0.1:3010/health
-curl http://127.0.0.1:3010/health/ready
-curl http://127.0.0.1:3010
+curl http://127.0.0.1:3011/health
+curl http://127.0.0.1:3011/health/ready
 ```
 
 Что проверяет:
 
 - `/health` — liveness
 - `/health/ready` — готовность приложения и доступность PostgreSQL
-- `/` — Mini App frontend
-
-## Mini App URL
-
-Для Telegram Mini App нужен публичный HTTPS URL. Compose поднимает локальный gateway на `127.0.0.1:3010`, поэтому дальше нужен ваш внешний reverse proxy или текущий Caddy/Nginx на хосте.
-
-Пример для Caddy:
-
-```caddy
-miniapp.example.com {
-    reverse_proxy 127.0.0.1:3010
-}
-```
-
-Дальше:
-
-1. Укажите в `.env` `WEBAPP_ALLOWED_ORIGINS=https://miniapp.example.com`
-2. Выполните `docker compose up -d --build`
-3. Проверьте [https://miniapp.example.com](https://miniapp.example.com)
-4. Установите этот URL в `@BotFather` как Mini App URL
 
 ## Логи
 
@@ -163,8 +127,6 @@ miniapp.example.com {
 
 ```bash
 docker compose logs -f bot
-docker compose logs -f webapp
-docker compose logs -f nginx
 docker compose logs --tail=200 bot
 docker compose logs -f postgres
 ```
@@ -261,12 +223,6 @@ git log -1 --oneline
 
 ```bash
 docker compose up -d --force-recreate bot
-```
-
-Пересобрать только Mini App и gateway:
-
-```bash
-docker compose up -d --build webapp nginx
 ```
 
 ## Замечание По Секретам
