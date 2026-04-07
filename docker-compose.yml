@@ -95,6 +95,7 @@ services:
         max-file: "3"
     networks:
       - bot-network
+      - remnawave-network
 
 volumes:
   postgres_data:
