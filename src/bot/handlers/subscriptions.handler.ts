@@ -45,6 +45,7 @@ import {
   subscriptionExpirationDaysKeyboard,
   subscriptionActionSuccessKeyboard,
   subscriptionCardKeyboard,
+  subscriptionRecreatedKeyboard,
   subscriptionsListKeyboard,
 } from '../keyboards/subscription.keyboards';
 import { confirmationKeyboard, inlineKeyboard } from '../keyboards/common.keyboards';
@@ -425,6 +426,54 @@ export class SubscriptionsHandler {
       'Возобновление подписки',
       callbackData.subscriptionResumeConfirm(subscriptionId),
       'Подписка снова станет активной. Если пауза была поставлена ботом, срок пересчитается из сохраненного остатка.',
+    );
+  }
+
+  async askRecreateConfirmation(ctx: BotContext, subscriptionId: string) {
+    await this.askActionConfirmation(
+      ctx,
+      subscriptionId,
+      'Сброс устройства',
+      callbackData.subscriptionRecreateConfirm(subscriptionId),
+      'Бот пересоздаст ключ. Старый ключ перестанет работать. Используйте это, если пользователь случайно подключил подписку на другом устройстве.',
+    );
+  }
+
+  async confirmRecreate(ctx: BotContext, subscriptionId: string) {
+    const access = await this.accessHandler.ensureDealer(ctx);
+    if (!access) {
+      return;
+    }
+
+    const result = await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `subscription:recreate:${subscriptionId}`,
+      () =>
+        this.subscriptionsService.recreateSubscriptionForDealer(
+          access.telegramId,
+          subscriptionId,
+        ),
+    );
+    const view = ctx.session.subscriptionsView ?? { mode: 'all' as const, page: 1 };
+    const copyableLink = result.happEncryptedUrl ?? result.subscriptionUrl;
+    if (copyableLink) {
+      setCreatedSubscriptionLink(ctx, result.subscription.id, copyableLink);
+    }
+
+    const subscription = await this.subscriptionsService.getSubscriptionForDealer(
+      access.telegramId,
+      subscriptionId,
+    );
+
+    await renderMessage(
+      ctx,
+      BotText.subscriptionRecreated(subscription.dealerUser.username),
+      subscriptionRecreatedKeyboard(
+        subscriptionId,
+        view.mode,
+        view.page,
+        Boolean(copyableLink),
+      ),
     );
   }
 

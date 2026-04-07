@@ -51,6 +51,32 @@ export const BotText = {
     return isAdmin ? '🏠 Главное меню' : '🏠 Панель дилера';
   },
 
+  mainMenuSummary(data: {
+    isAdmin: boolean;
+    dealer?: Dealer | null;
+    totalUsers?: number;
+  }) {
+    const lines: string[] = [];
+
+    if (data.dealer) {
+      lines.push(cardLine('🏷', 'Тег', formatDealerTagLabel(data.dealer.tag)));
+      lines.push(cardLine('📌', 'Статус', formatDealerStatusLabel(data.dealer)));
+      lines.push(cardLine('📅', 'Доступ до', formatDate(data.dealer.expiresAt)));
+      lines.push(cardLine('🔑', 'Лимит', String(data.dealer.keyLimit)));
+      lines.push(cardLine('📦', 'Создано', String(data.dealer.createdCount)));
+      lines.push(cardLine('✅', 'Осталось', formatRemainingKeys(data.dealer)));
+    } else {
+      lines.push('Выберите действие кнопками ниже.');
+    }
+
+    if (data.isAdmin) {
+      lines.push('');
+      lines.push(cardLine('👥', 'Всего пользователей', String(data.totalUsers ?? 0)));
+    }
+
+    return renderCard('🏠 Главное меню', lines);
+  },
+
   adminMenuTitle() {
     return renderCard('⚙️ Админ-панель', [
       'Быстрый доступ к дилерам, статистике и управлению.',
@@ -375,6 +401,14 @@ export const BotText = {
       cardLine('📌', 'Статус', formatSubscriptionStatusLabel(subscription)),
       '',
       dangerText,
+    ]);
+  },
+
+  subscriptionRecreated(username: string) {
+    return renderCard('✅ Ключ пересоздан', [
+      cardLine('👤', 'Пользователь', username),
+      'Старый ключ больше не действует.',
+      'Новый ключ можно показать кнопкой ниже.',
     ]);
   },
 

@@ -109,6 +109,12 @@ export function subscriptionCardKeyboard(
         callback_data: callbackData.subscriptionPauseAsk(subscriptionId),
       },
     ]);
+    rows.push([
+      {
+        text: '♻️ Сбросить устройство',
+        callback_data: callbackData.subscriptionRecreateAsk(subscriptionId),
+      },
+    ]);
   }
 
   if (status === SubscriptionStatus.PAUSED) {
@@ -156,6 +162,37 @@ export function subscriptionActionSuccessKeyboard(mode: 'all' | 'search', page: 
     ],
     [{ text: '🔙 В меню', callback_data: callbackData.mainMenu }],
   ]);
+}
+
+export function subscriptionRecreatedKeyboard(
+  subscriptionId: string,
+  mode: 'all' | 'search',
+  page: number,
+  hasLink: boolean,
+) {
+  const rows: Button[][] = [];
+
+  if (hasLink) {
+    rows.push([
+      {
+        text: '📋 Показать новый ключ',
+        callback_data: callbackData.dealerCreatedLink(subscriptionId),
+      },
+    ]);
+  }
+
+  rows.push([
+    {
+      text: '📋 К списку',
+      callback_data:
+        mode === 'search'
+          ? callbackData.subscriptionsSearchResults(page)
+          : callbackData.subscriptionsList(page),
+    },
+  ]);
+  rows.push([{ text: '🔙 В меню', callback_data: callbackData.mainMenu }]);
+
+  return inlineKeyboard(rows);
 }
 
 function statusChip(status: SubscriptionStatus, expiresAt: Date): string {

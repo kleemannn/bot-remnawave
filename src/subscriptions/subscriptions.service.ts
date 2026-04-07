@@ -14,6 +14,7 @@ import { RemnawaveService } from '../remnawave/remnawave.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { HappCryptoService } from '../happ/happ-crypto.service';
 import { CreateSubscriptionResult } from './interfaces/create-subscription-result.interface';
+import { CreateRemnawaveUserResult } from '../remnawave/interfaces/create-user-result.interface';
 
 @Injectable()
 export class SubscriptionsService {
@@ -231,6 +232,14 @@ export class SubscriptionsService {
     };
   }
 
+  async countTotalUsers(): Promise<number> {
+    return this.prisma.subscription.count({
+      where: {
+        status: { not: SubscriptionStatus.DELETED },
+      },
+    });
+  }
+
   async getSubscriptionForDealer(dealerTelegramId: bigint, subscriptionId: string) {
     const subscription = await this.getOwnedSubscriptionOrThrow(
       dealerTelegramId,
@@ -377,6 +386,119 @@ export class SubscriptionsService {
     });
 
     return updated;
+  }
+
+  async recreateSubscriptionForDealer(
+    dealerTelegramId: bigint,
+    subscriptionId: string,
+  ): Promise<CreateSubscriptionResult> {
+    const dealer = await this.getDealerOrThrow(dealerTelegramId);
+    const subscription = await this.getOwnedSubscriptionOrThrow(
+      dealerTelegramId,
+      subscriptionId,
+    );
+
+    if (subscription.status !== SubscriptionStatus.ACTIVE) {
+      throw new BadRequestException(
+        'Сброс устройства доступен только для активной подписки.',
+      );
+    }
+
+    const squadId =
+      dealer.tag === DealerTag.PREMIUM
+        ? this.configService.getOrThrow<string>('remnawave.premiumSquadId')
+        : this.configService.getOrThrow<string>('remnawave.standardSquadId');
+    const ownerTag = buildRemnawaveOwnerTag(dealer.username, dealer.telegramId);
+
+    await this.remnawaveService.deleteUser(subscription.remnawaveUserId);
+
+    let remote: CreateRemnawaveUserResult;
+    try {
+      remote = await this.remnawaveService.createUser({
+        username: subscription.dealerUser.username,
+        squadId,
+        tag: ownerTag,
+        expiresAt: subscription.expiresAt,
+      });
+    } catch (error) {
+      await this.auditService.record({
+        actorId: dealerTelegramId,
+        actorRole: 'dealer',
+        action: 'SUBSCRIPTION_RECREATE',
+        entity: 'subscriptions',
+        entityId: subscription.id,
+        success: false,
+        previousState: {
+          status: subscription.status,
+          expiresAt: subscription.expiresAt,
+          remnawaveUserId: subscription.remnawaveUserId,
+        },
+        metadata: {
+          username: subscription.dealerUser.username,
+          squadId,
+          ownerTag,
+          failedAt: 'create_new_remote_user',
+        },
+      });
+      throw error;
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.dealerUser.update({
+        where: { id: subscription.dealerUserId },
+        data: { remnawaveUserId: remote.userId },
+      });
+
+      return tx.subscription.update({
+        where: { id: subscription.id },
+        data: {
+          remnawaveUserId: remote.userId,
+          status: SubscriptionStatus.ACTIVE,
+          pausedAt: null,
+          remainingSeconds: null,
+          expiresAt: subscription.expiresAt,
+        },
+      });
+    });
+
+    await this.auditService.record({
+      actorId: dealerTelegramId,
+      actorRole: 'dealer',
+      action: 'SUBSCRIPTION_RECREATE',
+      entity: 'subscriptions',
+      entityId: subscription.id,
+      success: true,
+      previousState: {
+        status: subscription.status,
+        expiresAt: subscription.expiresAt,
+        remnawaveUserId: subscription.remnawaveUserId,
+      },
+      newState: {
+        status: updated.status,
+        expiresAt: updated.expiresAt,
+        remnawaveUserId: updated.remnawaveUserId,
+      },
+      metadata: {
+        username: subscription.dealerUser.username,
+        squadId,
+        ownerTag,
+        previousRemnawaveUserId: subscription.remnawaveUserId,
+        newRemnawaveUserId: remote.userId,
+      },
+    });
+
+    let happEncryptedUrl: string | undefined;
+    if (remote.subscriptionUrl) {
+      happEncryptedUrl = await this.happCryptoService.encryptSubscriptionUrl(
+        remote.subscriptionUrl,
+      );
+    }
+
+    return {
+      subscription: updated,
+      subscriptionUrl: remote.subscriptionUrl,
+      happEncryptedUrl,
+    };
   }
 
   async getSubscriptionExpiry(dealerTelegramId: bigint, subscriptionId: string) {

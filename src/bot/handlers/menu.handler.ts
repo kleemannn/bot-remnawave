@@ -19,10 +19,14 @@ import {
   renderMessage,
 } from '../utils/context.util';
 import { BotAccessHandler } from './bot-access.handler';
+import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
 
 @Injectable()
 export class MenuHandler {
-  constructor(private readonly accessHandler: BotAccessHandler) {}
+  constructor(
+    private readonly accessHandler: BotAccessHandler,
+    private readonly subscriptionsService: SubscriptionsService,
+  ) {}
 
   async showWelcome(ctx: BotContext) {
     clearFlow(ctx);
@@ -30,10 +34,17 @@ export class MenuHandler {
     clearPendingAction(ctx);
 
     const access = await this.accessHandler.getAccess(ctx);
+    const totalUsers = access.isAdmin
+      ? await this.subscriptionsService.countTotalUsers()
+      : undefined;
 
     await renderMessage(
       ctx,
-      BotText.welcome(access.isAdmin, Boolean(access.dealer)),
+      `${BotText.welcome(access.isAdmin, Boolean(access.dealer))}\n\n${BotText.mainMenuSummary({
+        isAdmin: access.isAdmin,
+        dealer: access.dealer,
+        totalUsers,
+      })}`,
       dealerMainMenuKeyboard(Boolean(access.dealer), access.isAdmin),
     );
   }
@@ -44,9 +55,15 @@ export class MenuHandler {
     clearPendingAction(ctx);
 
     const access = await this.accessHandler.getAccess(ctx);
-    const text = prefix
-      ? `${prefix}\n\n${BotText.mainMenuTitle(access.isAdmin)}`
-      : BotText.mainMenuTitle(access.isAdmin);
+    const totalUsers = access.isAdmin
+      ? await this.subscriptionsService.countTotalUsers()
+      : undefined;
+    const summary = BotText.mainMenuSummary({
+      isAdmin: access.isAdmin,
+      dealer: access.dealer,
+      totalUsers,
+    });
+    const text = prefix ? `${prefix}\n\n${summary}` : summary;
 
     await renderMessage(
       ctx,

@@ -283,6 +283,22 @@ export class BotUpdate {
         return;
       }
 
+      if (data.startsWith('subs:recreate:ask:')) {
+        await this.subscriptionsHandler.askRecreateConfirmation(
+          ctx,
+          this.getCallbackSegment(data, 3),
+        );
+        return;
+      }
+
+      if (data.startsWith('subs:recreate:confirm:')) {
+        await this.subscriptionsHandler.confirmRecreate(
+          ctx,
+          this.getCallbackSegment(data, 3),
+        );
+        return;
+      }
+
       if (data.startsWith('subs:resume:ask:')) {
         await this.subscriptionsHandler.askResumeConfirmation(
           ctx,

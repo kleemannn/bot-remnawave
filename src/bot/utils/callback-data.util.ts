@@ -16,6 +16,10 @@ export const callbackData = {
   subscriptionPauseAsk: (subscriptionId: string) => `subs:pause:ask:${subscriptionId}`,
   subscriptionPauseConfirm: (subscriptionId: string) =>
     `subs:pause:confirm:${subscriptionId}`,
+  subscriptionRecreateAsk: (subscriptionId: string) =>
+    `subs:recreate:ask:${subscriptionId}`,
+  subscriptionRecreateConfirm: (subscriptionId: string) =>
+    `subs:recreate:confirm:${subscriptionId}`,
   subscriptionResumeAsk: (subscriptionId: string) =>
     `subs:resume:ask:${subscriptionId}`,
   subscriptionResumeConfirm: (subscriptionId: string) =>
