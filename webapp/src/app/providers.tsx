@@ -37,6 +37,30 @@ export function Providers({ children }: PropsWithChildren) {
   });
 
   useEffect(() => {
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const message =
+        event.reason instanceof Error
+          ? event.reason.message
+          : typeof event.reason === 'string'
+            ? event.reason
+            : 'Unhandled promise rejection';
+      setAuthError(message);
+    };
+
+    const onWindowError = (event: ErrorEvent) => {
+      setAuthError(event.message || 'Неизвестная ошибка окна.');
+    };
+
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+    window.addEventListener('error', onWindowError);
+
+    return () => {
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+      window.removeEventListener('error', onWindowError);
+    };
+  }, [setAuthError]);
+
+  useEffect(() => {
     setShowNav(
       pathname === '/' ||
         pathname === '/dashboard' ||
