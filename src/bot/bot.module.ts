@@ -11,6 +11,7 @@ import { SubscriptionsHandler } from './handlers/subscriptions.handler';
 import { AdminHandler } from './handlers/admin.handler';
 import { BotAccessHandler } from './handlers/bot-access.handler';
 import { BotProtectionService } from './services/bot-protection.service';
+import { BotRunnerService } from './bot-runner.service';
 
 @Module({
   imports: [AuthModule, DealersModule, SubscriptionsModule],
@@ -21,6 +22,7 @@ import { BotProtectionService } from './services/bot-protection.service';
     SubscriptionsHandler,
     AdminHandler,
     BotAccessHandler,
+    BotRunnerService,
     BotProtectionService,
     AdminGuard,
     DealerGuard,
