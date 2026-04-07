@@ -54,14 +54,15 @@ import { AuditModule } from './common/audit/audit.module';
                 return (record?.data ?? undefined) as Record<string, unknown> | undefined;
               },
               set: async (key, value) => {
+                const resolvedValue = await value;
                 await prismaService.telegramSession.upsert({
                   where: { key },
                   update: {
-                    data: value as Prisma.InputJsonValue,
+                    data: resolvedValue as Prisma.InputJsonValue,
                   },
                   create: {
                     key,
-                    data: value as Prisma.InputJsonValue,
+                    data: resolvedValue as Prisma.InputJsonValue,
                   },
                 });
               },
