@@ -38,7 +38,10 @@ export function Providers({ children }: PropsWithChildren) {
 
   useEffect(() => {
     setShowNav(
-      pathname === '/dashboard' || pathname === '/subscriptions' || pathname === '/profile',
+      pathname === '/' ||
+        pathname === '/dashboard' ||
+        pathname === '/subscriptions' ||
+        pathname === '/profile',
     );
   }, [pathname]);
 
