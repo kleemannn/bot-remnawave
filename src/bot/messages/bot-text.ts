@@ -153,7 +153,14 @@ export const BotText = {
     ]);
   },
 
-  askSubscriptionExpiration() {
+  askSubscriptionExpirationMode() {
+    return renderCard('📅 Изменение срока подписки', [
+      'Выберите способ изменения срока.',
+      'Можно добавить дни или сразу указать точную дату и время окончания.',
+    ]);
+  },
+
+  askSubscriptionExpirationDays() {
     return renderCard('📅 Продление подписки', [
       'Введите количество дней, например 15.',
       'Или выберите быстрый вариант кнопкой ниже.',
@@ -161,10 +168,26 @@ export const BotText = {
     ]);
   },
 
+  askSubscriptionExpirationDateTime() {
+    return renderCard('📅 Установка даты окончания', [
+      'Введите точную дату и время окончания подписки.',
+      'Поддерживаются форматы: ДД.ММ.ГГГГ ЧЧ:ММ, ДД.ММ.ГГГГ, YYYY-MM-DD HH:mm, YYYY-MM-DD.',
+      'Если время не указано, бот поставит 23:59.',
+    ]);
+  },
+
   confirmSubscriptionExpirationChange(username: string, days: number, formattedDate: string) {
     return renderCard('📅 Подтвердите продление', [
       cardLine('👤', 'Пользователь', username),
       cardLine('➕', 'Добавить', `${days} дн.`),
+      cardLine('📅', 'Новый срок', formattedDate),
+      'Если все верно, нажмите «Сохранить».',
+    ]);
+  },
+
+  confirmSubscriptionExpirationDateChange(username: string, formattedDate: string) {
+    return renderCard('📅 Подтвердите новый срок', [
+      cardLine('👤', 'Пользователь', username),
       cardLine('📅', 'Новый срок', formattedDate),
       'Если все верно, нажмите «Сохранить».',
     ]);

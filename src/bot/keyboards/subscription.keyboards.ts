@@ -36,6 +36,31 @@ export function subscriptionExpirationDaysKeyboard(subscriptionId: string) {
       { text: '+7 дней', callback_data: callbackData.subscriptionChangeExpirationDays(subscriptionId, 7) },
       { text: '+30 дней', callback_data: callbackData.subscriptionChangeExpirationDays(subscriptionId, 30) },
     ],
+    [
+      {
+        text: '📅 Точная дата и время',
+        callback_data: callbackData.subscriptionChangeExpirationMode(subscriptionId, 'datetime'),
+      },
+    ],
+    [{ text: '🔙 Назад', callback_data: callbackData.subscriptionChangeExpirationAsk(subscriptionId) }],
+    [{ text: '❌ Отмена', callback_data: callbackData.cancelFlow }],
+  ]);
+}
+
+export function subscriptionExpirationModeKeyboard(subscriptionId: string) {
+  return inlineKeyboard([
+    [
+      {
+        text: '➕ Добавить дни',
+        callback_data: callbackData.subscriptionChangeExpirationMode(subscriptionId, 'days'),
+      },
+    ],
+    [
+      {
+        text: '📅 Точная дата и время',
+        callback_data: callbackData.subscriptionChangeExpirationMode(subscriptionId, 'datetime'),
+      },
+    ],
     [{ text: '❌ Отмена', callback_data: callbackData.cancelFlow }],
   ]);
 }

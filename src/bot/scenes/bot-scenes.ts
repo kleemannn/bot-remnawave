@@ -31,10 +31,12 @@ export interface DealerSearchSubscriptionFlow {
 
 export interface DealerChangeSubscriptionExpirationFlow {
   type: typeof BOT_FLOW.DEALER_CHANGE_SUBSCRIPTION_EXPIRATION;
-  step: 'days' | 'confirm';
+  step: 'mode' | 'days' | 'datetime' | 'confirm';
   data: {
     subscriptionId?: string;
+    mode?: 'days' | 'datetime';
     days?: number;
+    expiresAtIso?: string;
   };
 }
 

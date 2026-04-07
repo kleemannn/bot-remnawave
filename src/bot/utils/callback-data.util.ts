@@ -26,6 +26,10 @@ export const callbackData = {
     `subs:resume:confirm:${subscriptionId}`,
   subscriptionChangeExpirationAsk: (subscriptionId: string) =>
     `subs:expiration:ask:${subscriptionId}`,
+  subscriptionChangeExpirationMode: (
+    subscriptionId: string,
+    mode: 'days' | 'datetime',
+  ) => `subs:expiration:mode:${subscriptionId}:${mode}`,
   subscriptionChangeExpirationDays: (subscriptionId: string, days: number) =>
     `subs:expiration:days:${subscriptionId}:${days}`,
   subscriptionChangeExpirationConfirm: (subscriptionId: string) =>

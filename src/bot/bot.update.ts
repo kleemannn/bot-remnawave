@@ -250,6 +250,20 @@ export class BotUpdate {
         return;
       }
 
+      if (data.startsWith('subs:expiration:mode:')) {
+        const mode = this.getCallbackSegment(data, 4);
+        if (mode !== 'days' && mode !== 'datetime') {
+          throw new InvalidCallbackDataException('Неизвестный режим изменения срока.');
+        }
+
+        await this.subscriptionsHandler.selectChangeExpirationMode(
+          ctx,
+          this.getCallbackSegment(data, 3),
+          mode,
+        );
+        return;
+      }
+
       if (data.startsWith('subs:expiration:days:')) {
         await this.subscriptionsHandler.selectChangeExpirationDays(
           ctx,
