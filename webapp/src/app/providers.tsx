@@ -3,11 +3,23 @@
 import { PropsWithChildren, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { bootstrapTelegramAuth } from '@/lib/auth';
-import { applyTelegramTheme, expandTelegramWebApp } from '@/lib/telegram';
+import {
+  applyTelegramTheme,
+  expandTelegramWebApp,
+  getTelegramInitData,
+  getTelegramWebApp,
+} from '@/lib/telegram';
 import { useUserStore } from '@/store/useUserStore';
 import { BottomNav } from '@/components/BottomNav';
 import { ToastViewport } from '@/components/ToastViewport';
 import { Button } from '@/components/Button';
+
+interface AuthDebugState {
+  visible: boolean;
+  hasTelegram: boolean;
+  initDataLength: number;
+  readyState: string;
+}
 
 export function Providers({ children }: PropsWithChildren) {
   const pathname = usePathname();
@@ -17,6 +29,12 @@ export function Providers({ children }: PropsWithChildren) {
   const setSession = useUserStore((state) => state.setSession);
   const setAuthError = useUserStore((state) => state.setAuthError);
   const [showNav, setShowNav] = useState(false);
+  const [authDebug, setAuthDebug] = useState<AuthDebugState>({
+    visible: false,
+    hasTelegram: false,
+    initDataLength: 0,
+    readyState: 'loading',
+  });
 
   useEffect(() => {
     setShowNav(
@@ -39,6 +57,21 @@ export function Providers({ children }: PropsWithChildren) {
     }
 
     let active = true;
+    const debugTimer = window.setTimeout(() => {
+      if (!active) {
+        return;
+      }
+
+      const webApp = getTelegramWebApp();
+      const initData = getTelegramInitData();
+      setAuthDebug({
+        visible: true,
+        hasTelegram: Boolean(webApp),
+        initDataLength: initData.length,
+        readyState: document.readyState,
+      });
+    }, 3500);
+
     setAuthLoading();
     bootstrapTelegramAuth()
       .then((session) => {
@@ -46,6 +79,7 @@ export function Providers({ children }: PropsWithChildren) {
           return;
         }
 
+        window.clearTimeout(debugTimer);
         setSession({
           accessToken: session.accessToken,
           user: session.user,
@@ -57,11 +91,13 @@ export function Providers({ children }: PropsWithChildren) {
           return;
         }
 
+        window.clearTimeout(debugTimer);
         setAuthError(error instanceof Error ? error.message : 'Не удалось открыть панель.');
       });
 
     return () => {
       active = false;
+      window.clearTimeout(debugTimer);
     };
   }, [authStatus, setAuthError, setAuthLoading, setSession]);
 
@@ -72,6 +108,14 @@ export function Providers({ children }: PropsWithChildren) {
           <div className="mx-auto h-14 w-14 animate-pulse rounded-full bg-tg-muted" />
           <p className="text-base font-medium text-tg-text">Открываем панель…</p>
           <p className="text-sm text-tg-hint">Подключаем Telegram и загружаем ваши данные.</p>
+          {authDebug.visible ? (
+            <div className="rounded-2xl bg-tg-card p-4 text-left text-xs leading-5 text-tg-hint shadow-card">
+              <p>Диагностика загрузки:</p>
+              <p>Telegram SDK: {authDebug.hasTelegram ? 'есть' : 'нет'}</p>
+              <p>initData length: {authDebug.initDataLength}</p>
+              <p>document.readyState: {authDebug.readyState}</p>
+            </div>
+          ) : null}
         </div>
       </div>
     );
