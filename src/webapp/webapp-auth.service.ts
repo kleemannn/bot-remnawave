@@ -7,14 +7,11 @@ import { ConfigService } from '@nestjs/config';
 import { AppLoggerService } from '../common/logger/app-logger.service';
 import { AuthService } from '../auth/auth.service';
 import { WebappJwtPayload } from './interfaces/webapp-jwt-payload.interface';
+import {
+  TelegramMiniAppUser,
+  WebappAuthSession,
+} from './interfaces/webapp-auth-response.interface';
 import { signWebappToken, verifyWebappToken } from './utils/webapp-token.util';
-
-interface TelegramMiniAppUser {
-  id: number;
-  username?: string;
-  first_name?: string;
-  last_name?: string;
-}
 
 @Injectable()
 export class WebappAuthService {
@@ -24,7 +21,7 @@ export class WebappAuthService {
     private readonly logger: AppLoggerService,
   ) {}
 
-  async authenticate(initData: string) {
+  async authenticate(initData: string): Promise<WebappAuthSession> {
     const parsed = this.validateInitData(initData);
     const user = parsed.user;
 
@@ -64,13 +61,13 @@ export class WebappAuthService {
 
     this.logger.logEvent(
       'webapp_auth_succeeded',
-        {
-          telegramId: telegramId.toString(),
-          username: payload.username ?? null,
-          firstName: payload.firstName ?? null,
-        },
-        WebappAuthService.name,
-      );
+      {
+        telegramId: telegramId.toString(),
+        username: payload.username ?? null,
+        firstName: payload.firstName ?? null,
+      },
+      WebappAuthService.name,
+    );
 
     return {
       accessToken: signWebappToken(
@@ -89,7 +86,9 @@ export class WebappAuthService {
     );
   }
 
-  private validateInitData(initData: string) {
+  private validateInitData(initData: string): {
+    user: TelegramMiniAppUser | null;
+  } {
     const searchParams = new URLSearchParams(initData);
     const hash = searchParams.get('hash');
 
