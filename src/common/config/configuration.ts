@@ -5,6 +5,7 @@ export default () => ({
     logLevel: process.env.APP_LOG_LEVEL ?? 'log',
     healthcheckDbTimeoutMs: Number(process.env.HEALTHCHECK_DB_TIMEOUT_MS ?? 3000),
     version: process.env.APP_VERSION ?? process.env.npm_package_version ?? '1.0.0',
+    jwtSecret: process.env.WEBAPP_JWT_SECRET,
   },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN,
@@ -34,5 +35,13 @@ export default () => ({
   happ: {
     cryptoApiUrl: process.env.HAPP_CRYPTO_API_URL ?? 'https://crypto.happ.su/api-v2.php',
     timeoutMs: Number(process.env.HAPP_CRYPTO_TIMEOUT_MS ?? 10000),
+  },
+  webapp: {
+    jwtTtlSec: Number(process.env.WEBAPP_JWT_TTL_SEC ?? 43200),
+    initDataTtlSec: Number(process.env.WEBAPP_INIT_DATA_TTL_SEC ?? 3600),
+    allowedOrigins: (process.env.WEBAPP_ALLOWED_ORIGINS ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
   },
 });

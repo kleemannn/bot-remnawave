@@ -20,6 +20,15 @@ async function bootstrap() {
     }),
   );
   app.useLogger(logger);
+  const allowedOrigins =
+    configService.get<string[]>('webapp.allowedOrigins', []) ?? [];
+
+  if (allowedOrigins.length > 0) {
+    app.enableCors({
+      origin: allowedOrigins,
+      credentials: true,
+    });
+  }
 
   app.enableShutdownHooks();
 

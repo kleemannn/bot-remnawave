@@ -50,6 +50,52 @@ services:
       - bot-network
       - remnawave-network
 
+  webapp:
+    build:
+      context: ./webapp
+      dockerfile: Dockerfile
+    container_name: remna_dealer_webapp
+    restart: unless-stopped
+    init: true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000 >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - bot-network
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: remna_dealer_gateway
+    restart: unless-stopped
+    depends_on:
+      bot:
+        condition: service_healthy
+      webapp:
+        condition: service_started
+    ports:
+      - "127.0.0.1:3010:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - bot-network
+
 volumes:
   postgres_data:
 

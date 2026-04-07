@@ -17,6 +17,7 @@ import { HappModule } from './happ/happ.module';
 import { HealthModule } from './health/health.module';
 import { ErrorsModule } from './common/errors/errors.module';
 import { AuditModule } from './common/audit/audit.module';
+import { WebappModule } from './webapp/webapp.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { AuditModule } from './common/audit/audit.module';
     BotModule,
     NotificationsModule,
     HealthModule,
+    WebappModule,
   ],
 })
 export class AppModule {}
