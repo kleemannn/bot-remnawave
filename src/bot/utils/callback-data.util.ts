@@ -4,6 +4,7 @@ export const callbackData = {
   adminMenu: 'menu:admin',
   adminManagementMenu: 'menu:admin:management',
   dealerProfile: 'dealer:profile',
+  dealerExportUsers: 'dealer:export:users',
   dealerCreateStart: 'dealer:create:start',
   dealerCreateConfirm: 'dealer:create:confirm',
   dealerCreateDays: (days: number) => `dealer:create:days:${days}`,

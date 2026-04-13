@@ -173,6 +173,11 @@ export class BotUpdate {
         return;
       }
 
+      if (data === 'dealer:export:users') {
+        await this.dealerProfileHandler.exportUsers(ctx);
+        return;
+      }
+
       if (data === 'dealer:create:start') {
         await this.subscriptionsHandler.startCreateFlow(ctx);
         return;

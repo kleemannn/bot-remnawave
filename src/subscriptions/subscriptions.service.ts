@@ -535,6 +535,43 @@ export class SubscriptionsService {
     return this.happCryptoService.encryptSubscriptionUrl(subscriptionUrl);
   }
 
+  async exportDealerUsers(dealerTelegramId: bigint): Promise<Array<{ username: string; happUrl: string }>> {
+    const dealer = await this.getDealerOrThrow(dealerTelegramId);
+    await this.syncSubscriptionsForDealer(dealer.id);
+
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: {
+        dealerId: dealer.id,
+        status: { not: SubscriptionStatus.DELETED },
+      },
+      include: {
+        dealerUser: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    const exported: Array<{ username: string; happUrl: string }> = [];
+
+    for (const subscription of subscriptions) {
+      const subscriptionUrl = await this.remnawaveService.getUserSubscriptionUrl(
+        subscription.remnawaveUserId,
+      );
+
+      if (!subscriptionUrl) {
+        continue;
+      }
+
+      exported.push({
+        username: subscription.dealerUser.username,
+        happUrl: await this.happCryptoService.encryptSubscriptionUrl(subscriptionUrl),
+      });
+    }
+
+    return exported;
+  }
+
   async extendSubscriptionByDays(
     dealerTelegramId: bigint,
     subscriptionId: string,
