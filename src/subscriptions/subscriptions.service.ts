@@ -681,6 +681,139 @@ export class SubscriptionsService {
     return updated;
   }
 
+  async recreateAllSubscriptionsForAdmin(adminTelegramId: bigint): Promise<{
+    processed: number;
+    recreated: number;
+    failed: number;
+  }> {
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: {
+        status: { not: SubscriptionStatus.DELETED },
+      },
+      include: {
+        dealer: true,
+        dealerUser: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    let recreated = 0;
+    let failed = 0;
+
+    for (const subscription of subscriptions) {
+      try {
+        const squadId =
+          subscription.dealer.tag === DealerTag.PREMIUM
+            ? this.configService.getOrThrow<string>('remnawave.premiumSquadId')
+            : this.configService.getOrThrow<string>('remnawave.standardSquadId');
+        const ownerTag = buildRemnawaveOwnerTag(
+          subscription.dealer.username,
+          subscription.dealer.telegramId,
+        );
+
+        await this.remnawaveService.deleteUser(subscription.remnawaveUserId);
+
+        const remote = await this.remnawaveService.createUser({
+          username: subscription.dealerUser.username,
+          squadId,
+          tag: ownerTag,
+          expiresAt: subscription.expiresAt,
+        });
+
+        if (subscription.status === SubscriptionStatus.PAUSED) {
+          await this.remnawaveService.disableUser(remote.userId);
+        }
+
+        await this.prisma.$transaction(async (tx) => {
+          await tx.dealerUser.update({
+            where: { id: subscription.dealerUserId },
+            data: { remnawaveUserId: remote.userId },
+          });
+
+          await tx.subscription.update({
+            where: { id: subscription.id },
+            data: {
+              remnawaveUserId: remote.userId,
+              status: subscription.status,
+              pausedAt: subscription.pausedAt,
+              remainingSeconds: subscription.remainingSeconds,
+              expiresAt: subscription.expiresAt,
+            },
+          });
+        });
+
+        await this.auditService.record({
+          actorId: adminTelegramId,
+          actorRole: 'admin',
+          action: 'SUBSCRIPTION_RECREATE_ALL_ITEM',
+          entity: 'subscriptions',
+          entityId: subscription.id,
+          success: true,
+          previousState: {
+            status: subscription.status,
+            expiresAt: subscription.expiresAt,
+            remnawaveUserId: subscription.remnawaveUserId,
+          },
+          newState: {
+            status: subscription.status,
+            expiresAt: subscription.expiresAt,
+            remnawaveUserId: remote.userId,
+          },
+          metadata: {
+            username: subscription.dealerUser.username,
+            dealerTelegramId: subscription.dealer.telegramId.toString(),
+            previousRemnawaveUserId: subscription.remnawaveUserId,
+            newRemnawaveUserId: remote.userId,
+          },
+        });
+
+        recreated += 1;
+      } catch (error) {
+        failed += 1;
+
+        await this.auditService.record({
+          actorId: adminTelegramId,
+          actorRole: 'admin',
+          action: 'SUBSCRIPTION_RECREATE_ALL_ITEM',
+          entity: 'subscriptions',
+          entityId: subscription.id,
+          success: false,
+          previousState: {
+            status: subscription.status,
+            expiresAt: subscription.expiresAt,
+            remnawaveUserId: subscription.remnawaveUserId,
+          },
+          metadata: {
+            username: subscription.dealerUser.username,
+            dealerTelegramId: subscription.dealer.telegramId.toString(),
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+        });
+      }
+    }
+
+    await this.auditService.record({
+      actorId: adminTelegramId,
+      actorRole: 'admin',
+      action: 'SUBSCRIPTION_RECREATE_ALL',
+      entity: 'subscriptions',
+      success: true,
+      metadata: {
+        processed: subscriptions.length,
+        recreated,
+        failed,
+      },
+    });
+
+    return {
+      processed: subscriptions.length,
+      recreated,
+      failed,
+    };
+  }
+
   private async getDealerOrThrow(dealerTelegramId: bigint) {
     const dealer = await this.dealersService.getDealerByTelegramId(dealerTelegramId);
     if (!dealer) {

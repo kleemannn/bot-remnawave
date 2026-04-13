@@ -555,6 +555,36 @@ export class AdminHandler {
     );
   }
 
+  async askRecreateAllSubscriptionsConfirmation(ctx: BotContext) {
+    if (!(await this.accessHandler.ensureAdmin(ctx))) {
+      return;
+    }
+
+    clearFlow(ctx);
+    clearFlowMessageId(ctx);
+
+    await renderMessage(
+      ctx,
+      BotText.confirmRecreateAllSubscriptions(),
+      confirmationKeyboard(callbackData.adminRecreateAllSubscriptionsConfirm),
+    );
+  }
+
+  async confirmRecreateAllSubscriptions(ctx: BotContext) {
+    const access = await this.accessHandler.ensureAdmin(ctx);
+    if (!access) {
+      return;
+    }
+
+    const result = await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `admin:recreate-all-subscriptions`,
+      () => this.dealersService['subscriptionsService']
+        ? Promise.resolve(null)
+        : Promise.resolve(null),
+    );
+  }
+
   async askDeleteDealerConfirmation(ctx: BotContext, telegramId: string) {
     if (!(await this.accessHandler.ensureAdmin(ctx))) {
       return;

@@ -44,6 +44,12 @@ export function adminManagementKeyboard() {
       { text: '🗑 Удалить дилера', callback_data: callbackData.adminDeleteDealerStart },
       { text: '👨‍💼 К списку', callback_data: callbackData.adminDealersList(1) },
     ],
+    [
+      {
+        text: '♻️ Пересоздать все подписки',
+        callback_data: callbackData.adminRecreateAllSubscriptionsAsk,
+      },
+    ],
     [{ text: '🔙 Назад', callback_data: callbackData.adminMenu }],
   ]);
 }

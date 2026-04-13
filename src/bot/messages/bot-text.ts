@@ -91,6 +91,28 @@ export const BotText = {
     ]);
   },
 
+  confirmRecreateAllSubscriptions() {
+    return renderCard('♻️ Пересоздание всех подписок', [
+      'Бот пересоздаст все активные и поставленные на паузу подписки всех дилеров.',
+      'Это полезно после смены домена, чтобы новые ссылки начали выдаваться автоматически.',
+      'Старые удаленные подписки затронуты не будут.',
+      '',
+      'Запускайте действие только один раз и дождитесь завершения.',
+    ]);
+  },
+
+  recreateAllSubscriptionsResult(data: {
+    processed: number;
+    recreated: number;
+    failed: number;
+  }) {
+    return renderCard('♻️ Массовое пересоздание завершено', [
+      cardLine('📦', 'Проверено', String(data.processed)),
+      cardLine('✅', 'Пересоздано', String(data.recreated)),
+      cardLine('❌', 'Ошибок', String(data.failed)),
+    ]);
+  },
+
   dealerHelp() {
     return renderCard('❓ Помощь дилеру', [
       '📦 Создавайте подписки пошагово без длинных команд.',
