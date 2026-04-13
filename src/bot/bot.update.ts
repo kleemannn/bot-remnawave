@@ -483,6 +483,16 @@ export class BotUpdate {
         return;
       }
 
+      if (data === 'admin:subs:recreate:ask') {
+        await this.adminHandler.askRecreateAllSubscriptionsConfirmation(ctx);
+        return;
+      }
+
+      if (data === 'admin:subs:recreate:confirm') {
+        await this.adminHandler.confirmRecreateAllSubscriptions(ctx);
+        return;
+      }
+
       if (data === 'admin:stats') {
         await this.adminHandler.showStats(ctx);
       }

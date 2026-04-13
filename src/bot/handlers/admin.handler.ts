@@ -3,6 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AddDealerDto } from '../../dealers/dto/add-dealer.dto';
 import { DealersService } from '../../dealers/dealers.service';
+import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
 import { BOT_UI } from '../constants/bot-ui.constants';
 import { BotContext } from '../interfaces/bot-context.interface';
 import { BotText } from '../messages/bot-text';
@@ -40,6 +41,7 @@ import { BotProtectionService } from '../services/bot-protection.service';
 export class AdminHandler {
   constructor(
     private readonly dealersService: DealersService,
+    private readonly subscriptionsService: SubscriptionsService,
     private readonly accessHandler: BotAccessHandler,
     private readonly menuHandler: MenuHandler,
     private readonly protectionService: BotProtectionService,
@@ -579,9 +581,16 @@ export class AdminHandler {
     const result = await this.protectionService.runExpensiveAction(
       access.telegramId.toString(),
       `admin:recreate-all-subscriptions`,
-      () => this.dealersService['subscriptionsService']
-        ? Promise.resolve(null)
-        : Promise.resolve(null),
+      () => this.subscriptionsService.recreateAllSubscriptionsForAdmin(access.telegramId),
+    );
+
+    clearFlow(ctx);
+    clearFlowMessageId(ctx);
+
+    await renderMessage(
+      ctx,
+      BotText.recreateAllSubscriptionsResult(result),
+      adminSuccessKeyboard(),
     );
   }
 
