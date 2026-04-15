@@ -260,14 +260,14 @@ export class RemnawaveService {
 
     const payload = data as Record<string, unknown>;
     const response = payload.response ?? payload.data ?? payload;
-    const items = Array.isArray(response)
+    const items: unknown[] = Array.isArray(response)
       ? response
       : Array.isArray((response as Record<string, unknown> | undefined)?.data)
-        ? (response as Record<string, unknown>).data
+        ? ((response as Record<string, unknown>).data as unknown[])
         : [];
 
     return items
-      .map((item) => this.parseHostRecord(item))
+      .map((item: unknown) => this.parseHostRecord(item))
       .filter((item): item is RemnawaveHost => Boolean(item));
   }
 
@@ -313,15 +313,15 @@ export class RemnawaveService {
 
     const payload = data as Record<string, unknown>;
     const response = payload.response ?? payload.data ?? payload;
-    const items = Array.isArray(response)
+    const items: unknown[] = Array.isArray(response)
       ? response
       : Array.isArray((response as Record<string, unknown> | undefined)?.data)
-        ? (response as Record<string, unknown>).data
+        ? ((response as Record<string, unknown>).data as unknown[])
         : [];
 
     return items
-      .filter((item): item is string => typeof item === 'string')
-      .map((item) => item.trim())
+      .filter((item: unknown): item is string => typeof item === 'string')
+      .map((item: string) => item.trim())
       .filter(Boolean);
   }
 

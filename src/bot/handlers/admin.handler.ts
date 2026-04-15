@@ -655,20 +655,22 @@ export class AdminHandler {
       return;
     }
 
+    const targetAddress = flow.data.address;
+
     const result = await this.protectionService.runExpensiveAction(
       access.telegramId.toString(),
-      `admin:hosts:ip:${flow.data.tag}:${flow.data.address}`,
+      `admin:hosts:ip:${flow.data.tag}:${targetAddress}`,
       async () => {
         let updated = 0;
         let skipped = 0;
 
         for (const host of hosts) {
-          if (host.address === flow.data.address) {
+          if (host.address === targetAddress) {
             skipped += 1;
             continue;
           }
 
-          await this.remnawaveService.updateHostAddress(host.uuid, flow.data.address);
+          await this.remnawaveService.updateHostAddress(host.uuid, targetAddress);
           updated += 1;
         }
 
