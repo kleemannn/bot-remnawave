@@ -46,6 +46,12 @@ export function adminManagementKeyboard() {
     ],
     [
       {
+        text: '🌐 Массово сменить IP хостов',
+        callback_data: callbackData.adminBulkHostIpStart,
+      },
+    ],
+    [
+      {
         text: '♻️ Пересоздать все подписки',
         callback_data: callbackData.adminRecreateAllSubscriptionsAsk,
       },
@@ -62,6 +68,16 @@ export function adminTagKeyboard() {
     ],
     [{ text: '❌ Отмена', callback_data: callbackData.cancelFlow }],
   ]);
+}
+
+export function adminHostTagKeyboard(tags: string[]) {
+  const rows: Button[][] = tags.map((tag) => [
+    { text: `🏷 ${tag}`, callback_data: callbackData.adminHostTagSelect(tag) },
+  ]);
+
+  rows.push([{ text: '❌ Отмена', callback_data: callbackData.cancelFlow }]);
+
+  return inlineKeyboard(rows);
 }
 
 export function dealersListKeyboard(items: DealerListItem[], page: number, pageCount: number) {

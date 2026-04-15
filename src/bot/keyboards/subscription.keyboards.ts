@@ -2,6 +2,7 @@ import { SubscriptionStatus } from '@prisma/client';
 import { buildPaginationRow } from '../pagination/pagination.util';
 import { callbackData } from '../utils/callback-data.util';
 import { formatSubscriptionStatusLabel } from '../formatters/status.formatter';
+import { formatTraffic } from '../utils/format.util';
 import { Button, inlineKeyboard } from './common.keyboards';
 
 interface SubscriptionListItem {
@@ -11,6 +12,8 @@ interface SubscriptionListItem {
   };
   status: SubscriptionStatus;
   expiresAt: Date;
+  usedTrafficBytes?: number;
+  isOnlineNow?: boolean;
 }
 
 export function createSubscriptionConfirmKeyboard() {
@@ -73,7 +76,12 @@ export function subscriptionsListKeyboard(
 ) {
   const rows: Button[][] = items.map((item) => [
     {
-      text: `👤 ${item.dealerUser.username} • ${statusChip(item.status, item.expiresAt)}`,
+      text: [
+        `👤 ${item.dealerUser.username}`,
+        statusChip(item.status, item.expiresAt),
+        formatTraffic(item.usedTrafficBytes),
+        onlineChip(item.isOnlineNow),
+      ].join(' • '),
       callback_data: callbackData.subscriptionCard(item.id),
     },
   ]);
@@ -225,4 +233,16 @@ function statusChip(status: SubscriptionStatus, expiresAt: Date): string {
     status,
     expiresAt,
   });
+}
+
+function onlineChip(isOnlineNow?: boolean): string {
+  if (isOnlineNow === true) {
+    return '🟢 Онлайн';
+  }
+
+  if (isOnlineNow === false) {
+    return '⚪ Оффлайн';
+  }
+
+  return '❔ Статус ?';
 }

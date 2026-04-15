@@ -69,3 +69,37 @@ export function formatUsername(value?: string | null): string {
 
   return value.startsWith('@') ? value : `@${value}`;
 }
+
+export function formatTraffic(bytes?: number | null): string {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) {
+    return 'Неизвестно';
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const digits = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toFixed(digits)} ${units[unitIndex]}`;
+}
+
+export function formatOnlineNow(value?: boolean): string {
+  if (value === true) {
+    return 'Да';
+  }
+
+  if (value === false) {
+    return 'Нет';
+  }
+
+  return 'Неизвестно';
+}

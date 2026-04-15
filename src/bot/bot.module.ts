@@ -3,6 +3,7 @@ import { BotUpdate } from './bot.update';
 import { AuthModule } from '../auth/auth.module';
 import { DealersModule } from '../dealers/dealers.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { RemnawaveModule } from '../remnawave/remnawave.module';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { DealerGuard } from '../common/guards/dealer.guard';
 import { MenuHandler } from './handlers/menu.handler';
@@ -13,7 +14,7 @@ import { BotAccessHandler } from './handlers/bot-access.handler';
 import { BotProtectionService } from './services/bot-protection.service';
 
 @Module({
-  imports: [AuthModule, DealersModule, SubscriptionsModule],
+  imports: [AuthModule, DealersModule, SubscriptionsModule, RemnawaveModule],
   providers: [
     BotUpdate,
     MenuHandler,

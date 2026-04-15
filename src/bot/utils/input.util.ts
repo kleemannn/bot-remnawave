@@ -1,6 +1,7 @@
 import { DealerTag } from '@prisma/client';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
+import { isIP } from 'node:net';
 
 dayjs.extend(customParseFormat);
 
@@ -122,4 +123,35 @@ export function parseExpirationDate(input: string): ParsedInput<Date> {
     error:
       'Не удалось распознать дату. Используйте формат ДД.ММ.ГГГГ ЧЧ:ММ или YYYY-MM-DD HH:mm.',
   };
+}
+
+export function parseHostAddress(input: string): ParsedInput<string> {
+  const value = input.trim();
+
+  if (!value) {
+    return {
+      ok: false,
+      error: 'IP или host не может быть пустым. Введите значение еще раз.',
+    };
+  }
+
+  if (/\s/.test(value)) {
+    return {
+      ok: false,
+      error: 'IP или host не должен содержать пробелы. Попробуйте еще раз.',
+    };
+  }
+
+  const isValidIp = isIP(value) !== 0;
+  const isValidHostname =
+    /^(?=.{1,253}$)(?!-)(?:[A-Za-z0-9-]{1,63}\.)*[A-Za-z0-9-]{1,63}$/.test(value);
+
+  if (!isValidIp && !isValidHostname) {
+    return {
+      ok: false,
+      error: 'Введите корректный IP или host. Например: 154.206.12.210',
+    };
+  }
+
+  return { ok: true, value };
 }

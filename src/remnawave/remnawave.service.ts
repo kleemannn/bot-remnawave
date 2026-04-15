@@ -13,6 +13,18 @@ interface RemnawaveUserState {
   status?: string;
   expireAt?: Date;
   subscriptionUrl?: string;
+  usedTrafficBytes?: number;
+  isOnlineNow?: boolean;
+}
+
+export interface RemnawaveHost {
+  uuid: string;
+  remark: string;
+  address: string;
+  port?: number;
+  host?: string | null;
+  tag?: string | null;
+  isDisabled?: boolean;
 }
 
 type RemnawaveMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
@@ -115,6 +127,52 @@ export class RemnawaveService {
     return state.subscriptionUrl ?? null;
   }
 
+  async getAllHosts(): Promise<RemnawaveHost[]> {
+    const responseData = await this.request<unknown>({
+      method: 'GET',
+      path: '/hosts',
+      operation: 'getAllHosts',
+      safeToRetry: true,
+    });
+
+    return this.parseHostsResponse(responseData);
+  }
+
+  async getAllHostTags(): Promise<string[]> {
+    const responseData = await this.request<unknown>({
+      method: 'GET',
+      path: '/hosts/tags',
+      operation: 'getAllHostTags',
+      safeToRetry: true,
+    });
+
+    return this.parseHostTagsResponse(responseData);
+  }
+
+  async updateHostAddress(hostUuid: string, address: string): Promise<RemnawaveHost> {
+    const responseData = await this.request<unknown>({
+      method: 'PATCH',
+      path: '/hosts',
+      operation: 'updateHost',
+      data: {
+        uuid: hostUuid,
+        address,
+      },
+      safeToRetry: true,
+    });
+
+    const host = this.parseHostResponse(responseData);
+    if (!host) {
+      throw new ExternalServiceException(
+        'Remnawave вернул некорректный ответ при обновлении хоста.',
+        'remnawave',
+        'updateHost',
+      );
+    }
+
+    return host;
+  }
+
   private getErrorStatus(error: unknown): number | undefined {
     if (!error || typeof error !== 'object') {
       return undefined;
@@ -142,6 +200,42 @@ export class RemnawaveService {
       response.expiresAt ??
       nested.expireAt ??
       nested.expiresAt;
+    const usedTrafficCandidate = this.pickFirstDefined([
+      response.usedTrafficBytes,
+      response.usedTraffic,
+      response.used_traffic,
+      response.trafficUsedBytes,
+      response.trafficUsed,
+      response.traffic_used,
+      (response.traffic as Record<string, unknown> | undefined)?.usedBytes,
+      (response.traffic as Record<string, unknown> | undefined)?.used,
+      nested.usedTrafficBytes,
+      nested.usedTraffic,
+      nested.used_traffic,
+      nested.trafficUsedBytes,
+      nested.trafficUsed,
+      nested.traffic_used,
+      (nested.traffic as Record<string, unknown> | undefined)?.usedBytes,
+      (nested.traffic as Record<string, unknown> | undefined)?.used,
+    ]);
+    const onlineCandidate = this.pickFirstDefined([
+      response.isOnline,
+      response.online,
+      response.is_online,
+      response.connected,
+      response.activeNow,
+      response.active_now,
+      (response.session as Record<string, unknown> | undefined)?.isOnline,
+      (response.session as Record<string, unknown> | undefined)?.online,
+      nested.isOnline,
+      nested.online,
+      nested.is_online,
+      nested.connected,
+      nested.activeNow,
+      nested.active_now,
+      (nested.session as Record<string, unknown> | undefined)?.isOnline,
+      (nested.session as Record<string, unknown> | undefined)?.online,
+    ]);
 
     const expireAt =
       typeof expireAtCandidate === 'string' || expireAtCandidate instanceof Date
@@ -154,7 +248,134 @@ export class RemnawaveService {
       expireAt:
         expireAt && !Number.isNaN(expireAt.getTime()) ? expireAt : undefined,
       subscriptionUrl: this.adapter.fromCreateUserResponse(data)?.subscriptionUrl,
+      usedTrafficBytes: this.parseNumberCandidate(usedTrafficCandidate),
+      isOnlineNow: this.parseBooleanCandidate(onlineCandidate),
     };
+  }
+
+  private parseHostsResponse(data: unknown): RemnawaveHost[] {
+    if (!data || typeof data !== 'object') {
+      return [];
+    }
+
+    const payload = data as Record<string, unknown>;
+    const response = payload.response ?? payload.data ?? payload;
+    const items = Array.isArray(response)
+      ? response
+      : Array.isArray((response as Record<string, unknown> | undefined)?.data)
+        ? (response as Record<string, unknown>).data
+        : [];
+
+    return items
+      .map((item) => this.parseHostRecord(item))
+      .filter((item): item is RemnawaveHost => Boolean(item));
+  }
+
+  private parseHostResponse(data: unknown): RemnawaveHost | null {
+    if (!data || typeof data !== 'object') {
+      return null;
+    }
+
+    const payload = data as Record<string, unknown>;
+    const response = payload.response ?? payload.data ?? payload;
+    return this.parseHostRecord(response);
+  }
+
+  private parseHostRecord(data: unknown): RemnawaveHost | null {
+    if (!data || typeof data !== 'object') {
+      return null;
+    }
+
+    const payload = data as Record<string, unknown>;
+    const uuid = payload.uuid;
+    const remark = payload.remark;
+    const address = payload.address;
+
+    if (typeof uuid !== 'string' || typeof remark !== 'string' || typeof address !== 'string') {
+      return null;
+    }
+
+    return {
+      uuid,
+      remark,
+      address,
+      port: typeof payload.port === 'number' ? payload.port : undefined,
+      host: typeof payload.host === 'string' ? payload.host : null,
+      tag: typeof payload.tag === 'string' ? payload.tag : null,
+      isDisabled: typeof payload.isDisabled === 'boolean' ? payload.isDisabled : undefined,
+    };
+  }
+
+  private parseHostTagsResponse(data: unknown): string[] {
+    if (!data || typeof data !== 'object') {
+      return [];
+    }
+
+    const payload = data as Record<string, unknown>;
+    const response = payload.response ?? payload.data ?? payload;
+    const items = Array.isArray(response)
+      ? response
+      : Array.isArray((response as Record<string, unknown> | undefined)?.data)
+        ? (response as Record<string, unknown>).data
+        : [];
+
+    return items
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  private pickFirstDefined(values: unknown[]): unknown {
+    return values.find((value) => value !== undefined && value !== null);
+  }
+
+  private parseNumberCandidate(value: unknown): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.trim();
+      if (!normalized) {
+        return undefined;
+      }
+
+      const parsed = Number(normalized);
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        return parsed;
+      }
+    }
+
+    return undefined;
+  }
+
+  private parseBooleanCandidate(value: unknown): boolean | undefined {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'number') {
+      if (value === 1) {
+        return true;
+      }
+
+      if (value === 0) {
+        return false;
+      }
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['true', '1', 'online', 'connected', 'active'].includes(normalized)) {
+        return true;
+      }
+
+      if (['false', '0', 'offline', 'disconnected', 'inactive'].includes(normalized)) {
+        return false;
+      }
+    }
+
+    return undefined;
   }
 
   private async postWithoutResult(path: string, operation: string): Promise<void> {

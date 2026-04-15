@@ -184,7 +184,7 @@ export class SubscriptionsService {
     });
 
     return {
-      items,
+      items: await this.attachRemoteUserState(items),
       total,
       page: currentPage,
       pageCount,
@@ -224,7 +224,7 @@ export class SubscriptionsService {
     });
 
     return {
-      items,
+      items: await this.attachRemoteUserState(items),
       total,
       page: currentPage,
       pageCount,
@@ -246,10 +246,40 @@ export class SubscriptionsService {
       subscriptionId,
     );
 
-    return this.prisma.subscription.findUniqueOrThrow({
+    const fullSubscription = await this.prisma.subscription.findUniqueOrThrow({
       where: { id: subscription.id },
       include: { dealerUser: true, dealer: true },
     });
+
+    const remote = await this.remnawaveService.getUserState(
+      fullSubscription.remnawaveUserId,
+    );
+
+    return {
+      ...fullSubscription,
+      usedTrafficBytes: remote.usedTrafficBytes,
+      isOnlineNow: remote.isOnlineNow,
+    };
+  }
+
+  private async attachRemoteUserState<
+    T extends { remnawaveUserId: string },
+  >(subscriptions: T[]): Promise<Array<T & {
+    usedTrafficBytes?: number;
+    isOnlineNow?: boolean;
+  }>> {
+    const states = await Promise.all(
+      subscriptions.map(async (subscription) => ({
+        subscription,
+        remote: await this.remnawaveService.getUserState(subscription.remnawaveUserId),
+      })),
+    );
+
+    return states.map(({ subscription, remote }) => ({
+      ...subscription,
+      usedTrafficBytes: remote.usedTrafficBytes,
+      isOnlineNow: remote.isOnlineNow,
+    }));
   }
 
   async deleteSubscription(dealerTelegramId: bigint, subscriptionId: string): Promise<void> {

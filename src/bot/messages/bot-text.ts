@@ -12,7 +12,9 @@ import {
   formatDate,
   formatDaysFromSeconds,
   formatDaysLeft,
+  formatOnlineNow,
   formatRemainingKeys,
+  formatTraffic,
   formatUsername,
 } from '../utils/format.util';
 
@@ -30,6 +32,8 @@ interface SubscriptionCardData {
     username: string | null;
     tag: DealerTag;
   };
+  usedTrafficBytes?: number;
+  isOnlineNow?: boolean;
 }
 
 export const BotText = {
@@ -280,6 +284,8 @@ export const BotText = {
         cardLine('🗓', 'Создана', formatDate(subscription.createdAt)),
         cardLine('📅', 'Действует до', formatDate(subscription.expiresAt)),
         cardLine('⏳', 'Осталось дней', daysLeft),
+        cardLine('📶', 'Трафик использовано', formatTraffic(subscription.usedTrafficBytes)),
+        cardLine('🟢', 'Сейчас в сети', formatOnlineNow(subscription.isOnlineNow)),
         cardLine('🏷', 'Тег дилера', formatDealerTagLabel(subscription.dealer.tag)),
         cardLine(
           '🏷',
@@ -477,6 +483,68 @@ export const BotText = {
 
   askTagSelection() {
     return renderCard('🏷 Выбор тега', ['Выберите новый тег дилера.']);
+  },
+
+  askHostTagSelection() {
+    return renderCard('🌐 Выбор тега хостов', [
+      'Выберите тег, у которого нужно массово заменить IP.',
+    ]);
+  },
+
+  emptyHostTags() {
+    return renderCard('🌐 Теги хостов не найдены', [
+      'В Remnawave пока нет тегов хостов для массового обновления.',
+    ]);
+  },
+
+  askHostAddressForTag(tag: string, hostCount: number) {
+    return renderCard('🌐 Новый IP для хостов', [
+      cardLine('🏷', 'Тег', tag),
+      cardLine('🧩', 'Найдено хостов', String(hostCount)),
+      'Введите новый IP или host, который нужно поставить всем найденным хостам.',
+    ]);
+  },
+
+  emptyHostsForTag(tag: string) {
+    return renderCard('🌐 Хосты не найдены', [
+      cardLine('🏷', 'Тег', tag),
+      'Для этого тега нет хостов. Выберите другой тег.',
+    ]);
+  },
+
+  confirmBulkHostIpChange(data: {
+    tag: string;
+    address: string;
+    total: number;
+    currentAddresses: string[];
+  }) {
+    return renderCard('🌐 Подтвердите массовую смену IP', [
+      cardLine('🏷', 'Тег', data.tag),
+      cardLine('🧩', 'Хостов найдено', String(data.total)),
+      cardLine('🆕', 'Новый IP/host', data.address),
+      cardLine(
+        '📍',
+        'Текущие адреса',
+        data.currentAddresses.length > 0 ? data.currentAddresses.join(', ') : 'Неизвестно',
+      ),
+      'После подтверждения бот обновит все хосты с этим тегом.',
+    ]);
+  },
+
+  bulkHostIpChangeResult(data: {
+    tag: string;
+    address: string;
+    total: number;
+    updated: number;
+    skipped: number;
+  }) {
+    return renderCard('✅ Массовая смена IP завершена', [
+      cardLine('🏷', 'Тег', data.tag),
+      cardLine('🆕', 'Новый IP/host', data.address),
+      cardLine('🧩', 'Всего хостов', String(data.total)),
+      cardLine('✅', 'Обновлено', String(data.updated)),
+      cardLine('⏭', 'Без изменений', String(data.skipped)),
+    ]);
   },
 
   confirmTagChange(telegramId: string, tag: string) {

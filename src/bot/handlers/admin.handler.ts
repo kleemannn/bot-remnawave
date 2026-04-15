@@ -4,13 +4,14 @@ import { validate } from 'class-validator';
 import { AddDealerDto } from '../../dealers/dto/add-dealer.dto';
 import { DealersService } from '../../dealers/dealers.service';
 import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
+import { RemnawaveHost, RemnawaveService } from '../../remnawave/remnawave.service';
 import { BOT_UI } from '../constants/bot-ui.constants';
 import { BotContext } from '../interfaces/bot-context.interface';
 import { BotText } from '../messages/bot-text';
-import { BOT_FLOW, AdminAddDealerFlow, AdminChangeExpirationFlow, AdminChangeLimitFlow, AdminChangeTagFlow, AdminDealerInfoFlow, AdminDeleteDealerFlow } from '../scenes/bot-scenes';
+import { BOT_FLOW, AdminAddDealerFlow, AdminBulkChangeHostIpFlow, AdminChangeExpirationFlow, AdminChangeLimitFlow, AdminChangeTagFlow, AdminDealerInfoFlow, AdminDeleteDealerFlow } from '../scenes/bot-scenes';
 import { callbackData } from '../utils/callback-data.util';
 import { formatDate } from '../utils/format.util';
-import { parseExpirationDate, parseNonNegativeInt, parsePositiveInt, parseTelegramId, sanitizeUsername } from '../utils/input.util';
+import { parseExpirationDate, parseHostAddress, parseNonNegativeInt, parsePositiveInt, parseTelegramId, sanitizeUsername } from '../utils/input.util';
 import {
   clearFlow,
   clearFlowMessageId,
@@ -28,6 +29,7 @@ import { BotAccessHandler } from './bot-access.handler';
 import { MenuHandler } from './menu.handler';
 import {
   adminSuccessKeyboard,
+  adminHostTagKeyboard,
   dealersDeleteListKeyboard,
   adminTagKeyboard,
   dealerAdminCardKeyboard,
@@ -42,6 +44,7 @@ export class AdminHandler {
   constructor(
     private readonly dealersService: DealersService,
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly remnawaveService: RemnawaveService,
     private readonly accessHandler: BotAccessHandler,
     private readonly menuHandler: MenuHandler,
     private readonly protectionService: BotProtectionService,
@@ -73,6 +76,12 @@ export class AdminHandler {
         await this.handleChangeExpirationText(
           ctx,
           flow as AdminChangeExpirationFlow,
+        );
+        return true;
+      case BOT_FLOW.ADMIN_BULK_CHANGE_HOST_IP:
+        await this.handleBulkChangeHostIpText(
+          ctx,
+          flow as AdminBulkChangeHostIpFlow,
         );
         return true;
       default:
@@ -557,6 +566,136 @@ export class AdminHandler {
     );
   }
 
+  async startBulkChangeHostIpFlow(ctx: BotContext) {
+    if (!(await this.accessHandler.ensureAdmin(ctx))) {
+      return;
+    }
+
+    const tags = await this.remnawaveService.getAllHostTags();
+    const visibleTags = Array.from(new Set(tags.filter(Boolean))).sort((left, right) =>
+      left.localeCompare(right),
+    );
+
+    if (visibleTags.length === 0) {
+      await renderMessage(
+        ctx,
+        BotText.emptyHostTags(),
+        inlineKeyboard([
+          [{ text: '🔙 Назад', callback_data: callbackData.adminManagementMenu }],
+          [{ text: '🔙 В меню', callback_data: callbackData.adminMenu }],
+        ]),
+      );
+      return;
+    }
+
+    setFlow(ctx, {
+      type: BOT_FLOW.ADMIN_BULK_CHANGE_HOST_IP,
+      step: 'tag',
+      data: {},
+    });
+
+    await this.showFlowStep(
+      ctx,
+      BotText.askHostTagSelection(),
+      adminHostTagKeyboard(visibleTags),
+    );
+  }
+
+  async selectHostTag(ctx: BotContext, tag: string) {
+    if (!(await this.accessHandler.ensureAdmin(ctx))) {
+      return;
+    }
+
+    const hosts = await this.getHostsByTag(tag);
+    if (hosts.length === 0) {
+      await this.showFlowStep(
+        ctx,
+        BotText.emptyHostsForTag(tag),
+        inlineKeyboard([
+          [{ text: '🔁 Выбрать другой тег', callback_data: callbackData.adminBulkHostIpStart }],
+          [{ text: '❌ Отмена', callback_data: callbackData.cancelFlow }],
+        ]),
+      );
+      return;
+    }
+
+    setFlow(ctx, {
+      type: BOT_FLOW.ADMIN_BULK_CHANGE_HOST_IP,
+      step: 'address',
+      data: { tag },
+    });
+
+    await this.menuHandler.showFlowPrompt(
+      ctx,
+      BotText.askHostAddressForTag(tag, hosts.length),
+    );
+  }
+
+  async confirmBulkChangeHostIp(ctx: BotContext) {
+    const access = await this.accessHandler.ensureAdmin(ctx);
+    if (!access) {
+      return;
+    }
+
+    const flow = ctx.session.flow;
+    if (
+      !flow ||
+      flow.type !== BOT_FLOW.ADMIN_BULK_CHANGE_HOST_IP ||
+      flow.step !== 'confirm' ||
+      !flow.data.tag ||
+      !flow.data.address
+    ) {
+      await this.showAdminMenu(ctx);
+      return;
+    }
+
+    const hosts = await this.getHostsByTag(flow.data.tag);
+    if (hosts.length === 0) {
+      await this.startBulkChangeHostIpFlow(ctx);
+      return;
+    }
+
+    const result = await this.protectionService.runExpensiveAction(
+      access.telegramId.toString(),
+      `admin:hosts:ip:${flow.data.tag}:${flow.data.address}`,
+      async () => {
+        let updated = 0;
+        let skipped = 0;
+
+        for (const host of hosts) {
+          if (host.address === flow.data.address) {
+            skipped += 1;
+            continue;
+          }
+
+          await this.remnawaveService.updateHostAddress(host.uuid, flow.data.address);
+          updated += 1;
+        }
+
+        return {
+          total: hosts.length,
+          updated,
+          skipped,
+        };
+      },
+    );
+
+    clearFlow(ctx);
+    clearFlowMessageId(ctx);
+
+    await renderMessage(
+      ctx,
+      BotText.bulkHostIpChangeResult({
+        tag: flow.data.tag,
+        address: flow.data.address,
+        total: result.total,
+        updated: result.updated,
+        skipped: result.skipped,
+      }),
+      adminSuccessKeyboard(),
+    );
+  }
+
   async askRecreateAllSubscriptionsConfirmation(ctx: BotContext) {
     if (!(await this.accessHandler.ensureAdmin(ctx))) {
       return;
@@ -940,5 +1079,67 @@ export class AdminHandler {
       ctx,
       'Проверьте дату и нажмите «Сохранить» или «Отмена».',
     );
+  }
+
+  private async handleBulkChangeHostIpText(
+    ctx: BotContext,
+    flow: AdminBulkChangeHostIpFlow,
+  ) {
+    const text = (ctx.message as { text?: string }).text?.trim() ?? '';
+    await this.deleteCurrentUserMessage(ctx);
+
+    if (flow.step === 'address') {
+      const parsed = parseHostAddress(text);
+      if (!parsed.ok || !parsed.value) {
+        await this.menuHandler.showFlowPrompt(
+          ctx,
+          parsed.error ?? 'Введите IP или host еще раз.',
+        );
+        return;
+      }
+
+      const hosts = await this.getHostsByTag(flow.data.tag ?? '');
+      if (hosts.length === 0 || !flow.data.tag) {
+        await this.startBulkChangeHostIpFlow(ctx);
+        return;
+      }
+
+      const currentAddresses = Array.from(
+        new Set(hosts.map((host) => host.address).filter(Boolean)),
+      ).slice(0, 6);
+
+      setFlow(ctx, {
+        type: BOT_FLOW.ADMIN_BULK_CHANGE_HOST_IP,
+        step: 'confirm',
+        data: {
+          tag: flow.data.tag,
+          address: parsed.value,
+        },
+      });
+
+      await this.showFlowStep(
+        ctx,
+        BotText.confirmBulkHostIpChange({
+          tag: flow.data.tag,
+          address: parsed.value,
+          total: hosts.length,
+          currentAddresses,
+        }),
+        saveKeyboard(callbackData.adminConfirmBulkHostIp),
+      );
+      return;
+    }
+
+    const tags = await this.remnawaveService.getAllHostTags();
+    await this.showFlowStep(
+      ctx,
+      BotText.askHostTagSelection(),
+      adminHostTagKeyboard(Array.from(new Set(tags.filter(Boolean))).sort()),
+    );
+  }
+
+  private async getHostsByTag(tag: string): Promise<RemnawaveHost[]> {
+    const hosts = await this.remnawaveService.getAllHosts();
+    return hosts.filter((host) => host.tag === tag);
   }
 }

@@ -8,6 +8,7 @@ export const BOT_FLOW = {
   ADMIN_CHANGE_TAG: 'admin_change_tag',
   ADMIN_CHANGE_LIMIT: 'admin_change_limit',
   ADMIN_CHANGE_EXPIRATION: 'admin_change_expiration',
+  ADMIN_BULK_CHANGE_HOST_IP: 'admin_bulk_change_host_ip',
 } as const;
 
 export type BotFlowType = (typeof BOT_FLOW)[keyof typeof BOT_FLOW];
@@ -95,6 +96,15 @@ export interface AdminChangeExpirationFlow {
   };
 }
 
+export interface AdminBulkChangeHostIpFlow {
+  type: typeof BOT_FLOW.ADMIN_BULK_CHANGE_HOST_IP;
+  step: 'tag' | 'address' | 'confirm';
+  data: {
+    tag?: string;
+    address?: string;
+  };
+}
+
 export type BotFlow =
   | DealerCreateSubscriptionFlow
   | DealerSearchSubscriptionFlow
@@ -104,7 +114,8 @@ export type BotFlow =
   | AdminDealerInfoFlow
   | AdminChangeTagFlow
   | AdminChangeLimitFlow
-  | AdminChangeExpirationFlow;
+  | AdminChangeExpirationFlow
+  | AdminBulkChangeHostIpFlow;
 
 export type PendingActionType =
   | 'subscription_pause'

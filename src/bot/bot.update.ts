@@ -103,6 +103,11 @@ export class BotUpdate {
     await this.safeExecute(ctx, () => this.adminHandler.showStats(ctx));
   }
 
+  @Command('set_host_ip')
+  async onSetHostIpShortcut(@Ctx() ctx: BotContext) {
+    await this.safeExecute(ctx, () => this.adminHandler.startBulkChangeHostIpFlow(ctx));
+  }
+
   @Command('delete')
   async onDeleteShortcut(@Ctx() ctx: BotContext) {
     await this.openSubscriptionsFromLegacyCommand(ctx);
@@ -480,6 +485,24 @@ export class BotUpdate {
 
       if (data === 'admin:expiration:confirm') {
         await this.adminHandler.confirmChangeExpiration(ctx);
+        return;
+      }
+
+      if (data === 'admin:hosts:ip:start') {
+        await this.adminHandler.startBulkChangeHostIpFlow(ctx);
+        return;
+      }
+
+      if (data.startsWith('admin:hosts:ip:tag:')) {
+        await this.adminHandler.selectHostTag(
+          ctx,
+          decodeURIComponent(this.getCallbackSegment(data, 4)),
+        );
+        return;
+      }
+
+      if (data === 'admin:hosts:ip:confirm') {
+        await this.adminHandler.confirmBulkChangeHostIp(ctx);
         return;
       }
 
