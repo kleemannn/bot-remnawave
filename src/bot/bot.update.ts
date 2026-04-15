@@ -493,10 +493,11 @@ export class BotUpdate {
         return;
       }
 
-      if (data.startsWith('admin:hosts:ip:tag:')) {
+      if (data.startsWith('admin:hosts:ip:profile:')) {
         await this.adminHandler.selectHostTag(
           ctx,
           decodeURIComponent(this.getCallbackSegment(data, 4)),
+          decodeURIComponent(this.getCallbackSegment(data, 5)),
         );
         return;
       }

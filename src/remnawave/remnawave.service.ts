@@ -25,6 +25,23 @@ export interface RemnawaveHost {
   host?: string | null;
   tag?: string | null;
   isDisabled?: boolean;
+  inbound?: {
+    configProfileUuid?: string | null;
+    configProfileInboundUuid?: string | null;
+  };
+}
+
+export interface RemnawaveConfigProfile {
+  uuid: string;
+  name: string;
+  inbounds: Array<{
+    uuid: string;
+    tag: string;
+    type?: string | null;
+    network?: string | null;
+    security?: string | null;
+    port?: number | null;
+  }>;
 }
 
 type RemnawaveMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
@@ -147,6 +164,17 @@ export class RemnawaveService {
     });
 
     return this.parseHostTagsResponse(responseData);
+  }
+
+  async getConfigProfiles(): Promise<RemnawaveConfigProfile[]> {
+    const responseData = await this.request<unknown>({
+      method: 'GET',
+      path: '/config-profiles',
+      operation: 'getConfigProfiles',
+      safeToRetry: true,
+    });
+
+    return this.parseConfigProfilesResponse(responseData);
   }
 
   async updateHostAddress(hostUuid: string, address: string): Promise<RemnawaveHost> {
@@ -303,6 +331,19 @@ export class RemnawaveService {
       host: typeof payload.host === 'string' ? payload.host : null,
       tag: typeof payload.tag === 'string' ? payload.tag : null,
       isDisabled: typeof payload.isDisabled === 'boolean' ? payload.isDisabled : undefined,
+      inbound:
+        payload.inbound && typeof payload.inbound === 'object'
+          ? {
+              configProfileUuid:
+                typeof (payload.inbound as Record<string, unknown>).configProfileUuid === 'string'
+                  ? ((payload.inbound as Record<string, unknown>).configProfileUuid as string)
+                  : null,
+              configProfileInboundUuid:
+                typeof (payload.inbound as Record<string, unknown>).configProfileInboundUuid === 'string'
+                  ? ((payload.inbound as Record<string, unknown>).configProfileInboundUuid as string)
+                  : null,
+            }
+          : undefined,
     };
   }
 
@@ -323,6 +364,69 @@ export class RemnawaveService {
       .filter((item: unknown): item is string => typeof item === 'string')
       .map((item: string) => item.trim())
       .filter(Boolean);
+  }
+
+  private parseConfigProfilesResponse(data: unknown): RemnawaveConfigProfile[] {
+    if (!data || typeof data !== 'object') {
+      return [];
+    }
+
+    const payload = data as Record<string, unknown>;
+    const response = payload.response ?? payload.data ?? payload;
+    const configProfiles: unknown[] = Array.isArray(
+      (response as Record<string, unknown> | undefined)?.configProfiles,
+    )
+      ? ((response as Record<string, unknown>).configProfiles as unknown[])
+      : Array.isArray(response)
+        ? response
+        : [];
+
+    return configProfiles
+      .map((item: unknown) => this.parseConfigProfile(item))
+      .filter((item): item is RemnawaveConfigProfile => Boolean(item));
+  }
+
+  private parseConfigProfile(data: unknown): RemnawaveConfigProfile | null {
+    if (!data || typeof data !== 'object') {
+      return null;
+    }
+
+    const payload = data as Record<string, unknown>;
+    if (typeof payload.uuid !== 'string' || typeof payload.name !== 'string') {
+      return null;
+    }
+
+    const inbounds = Array.isArray(payload.inbounds) ? payload.inbounds : [];
+
+    return {
+      uuid: payload.uuid,
+      name: payload.name,
+      inbounds: inbounds
+        .map((item: unknown) => this.parseConfigProfileInbound(item))
+        .filter((item): item is RemnawaveConfigProfile['inbounds'][number] => Boolean(item)),
+    };
+  }
+
+  private parseConfigProfileInbound(
+    data: unknown,
+  ): RemnawaveConfigProfile['inbounds'][number] | null {
+    if (!data || typeof data !== 'object') {
+      return null;
+    }
+
+    const payload = data as Record<string, unknown>;
+    if (typeof payload.uuid !== 'string' || typeof payload.tag !== 'string') {
+      return null;
+    }
+
+    return {
+      uuid: payload.uuid,
+      tag: payload.tag,
+      type: typeof payload.type === 'string' ? payload.type : null,
+      network: typeof payload.network === 'string' ? payload.network : null,
+      security: typeof payload.security === 'string' ? payload.security : null,
+      port: typeof payload.port === 'number' ? payload.port : null,
+    };
   }
 
   private pickFirstDefined(values: unknown[]): unknown {

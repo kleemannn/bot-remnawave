@@ -4,7 +4,7 @@ import { validate } from 'class-validator';
 import { AddDealerDto } from '../../dealers/dto/add-dealer.dto';
 import { DealersService } from '../../dealers/dealers.service';
 import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
-import { RemnawaveHost, RemnawaveService } from '../../remnawave/remnawave.service';
+import { RemnawaveConfigProfile, RemnawaveHost, RemnawaveService } from '../../remnawave/remnawave.service';
 import { BOT_UI } from '../constants/bot-ui.constants';
 import { BotContext } from '../interfaces/bot-context.interface';
 import { BotText } from '../messages/bot-text';
@@ -571,10 +571,7 @@ export class AdminHandler {
       return;
     }
 
-    const tags = await this.remnawaveService.getAllHostTags();
-    const visibleTags = Array.from(new Set(tags.filter(Boolean))).sort((left, right) =>
-      left.localeCompare(right),
-    );
+    const visibleTags = await this.getHostProfileOptions();
 
     if (visibleTags.length === 0) {
       await renderMessage(
@@ -590,7 +587,7 @@ export class AdminHandler {
 
     setFlow(ctx, {
       type: BOT_FLOW.ADMIN_BULK_CHANGE_HOST_IP,
-      step: 'tag',
+      step: 'profile',
       data: {},
     });
 
@@ -601,18 +598,26 @@ export class AdminHandler {
     );
   }
 
-  async selectHostTag(ctx: BotContext, tag: string) {
+  async selectHostTag(ctx: BotContext, profileUuid: string, inboundUuid: string) {
     if (!(await this.accessHandler.ensureAdmin(ctx))) {
       return;
     }
 
-    const hosts = await this.getHostsByTag(tag);
+    const selected = (await this.getHostProfileOptions()).find(
+      (item) => item.profileUuid === profileUuid && item.inboundUuid === inboundUuid,
+    );
+    if (!selected) {
+      await this.startBulkChangeHostIpFlow(ctx);
+      return;
+    }
+
+    const hosts = await this.getHostsByProfile(profileUuid, inboundUuid);
     if (hosts.length === 0) {
       await this.showFlowStep(
         ctx,
-        BotText.emptyHostsForTag(tag),
+        BotText.emptyHostsForTag(selected.profileName),
         inlineKeyboard([
-          [{ text: '🔁 Выбрать другой тег', callback_data: callbackData.adminBulkHostIpStart }],
+          [{ text: '🔁 Выбрать другой профиль', callback_data: callbackData.adminBulkHostIpStart }],
           [{ text: '❌ Отмена', callback_data: callbackData.cancelFlow }],
         ]),
       );
@@ -622,12 +627,17 @@ export class AdminHandler {
     setFlow(ctx, {
       type: BOT_FLOW.ADMIN_BULK_CHANGE_HOST_IP,
       step: 'address',
-      data: { tag },
+      data: {
+        profileUuid,
+        profileName: selected.profileName,
+        inboundUuid,
+        inboundTag: selected.inboundTag,
+      },
     });
 
     await this.menuHandler.showFlowPrompt(
       ctx,
-      BotText.askHostAddressForTag(tag, hosts.length),
+      BotText.askHostAddressForTag(selected.profileName, hosts.length),
     );
   }
 
@@ -642,14 +652,19 @@ export class AdminHandler {
       !flow ||
       flow.type !== BOT_FLOW.ADMIN_BULK_CHANGE_HOST_IP ||
       flow.step !== 'confirm' ||
-      !flow.data.tag ||
+      !flow.data.profileUuid ||
+      !flow.data.profileName ||
+      !flow.data.inboundUuid ||
       !flow.data.address
     ) {
       await this.showAdminMenu(ctx);
       return;
     }
 
-    const hosts = await this.getHostsByTag(flow.data.tag);
+    const hosts = await this.getHostsByProfile(
+      flow.data.profileUuid,
+      flow.data.inboundUuid,
+    );
     if (hosts.length === 0) {
       await this.startBulkChangeHostIpFlow(ctx);
       return;
@@ -659,7 +674,7 @@ export class AdminHandler {
 
     const result = await this.protectionService.runExpensiveAction(
       access.telegramId.toString(),
-      `admin:hosts:ip:${flow.data.tag}:${targetAddress}`,
+      `admin:hosts:ip:${flow.data.profileUuid}:${flow.data.inboundUuid}:${targetAddress}`,
       async () => {
         let updated = 0;
         let skipped = 0;
@@ -688,7 +703,7 @@ export class AdminHandler {
     await renderMessage(
       ctx,
       BotText.bulkHostIpChangeResult({
-        tag: flow.data.tag,
+        tag: flow.data.profileName,
         address: flow.data.address,
         total: result.total,
         updated: result.updated,
@@ -1100,8 +1115,16 @@ export class AdminHandler {
         return;
       }
 
-      const hosts = await this.getHostsByTag(flow.data.tag ?? '');
-      if (hosts.length === 0 || !flow.data.tag) {
+      const hosts =
+        flow.data.profileUuid && flow.data.inboundUuid
+          ? await this.getHostsByProfile(flow.data.profileUuid, flow.data.inboundUuid)
+          : [];
+      if (
+        hosts.length === 0 ||
+        !flow.data.profileUuid ||
+        !flow.data.profileName ||
+        !flow.data.inboundUuid
+      ) {
         await this.startBulkChangeHostIpFlow(ctx);
         return;
       }
@@ -1114,7 +1137,10 @@ export class AdminHandler {
         type: BOT_FLOW.ADMIN_BULK_CHANGE_HOST_IP,
         step: 'confirm',
         data: {
-          tag: flow.data.tag,
+          profileUuid: flow.data.profileUuid,
+          profileName: flow.data.profileName,
+          inboundUuid: flow.data.inboundUuid,
+          inboundTag: flow.data.inboundTag,
           address: parsed.value,
         },
       });
@@ -1122,7 +1148,7 @@ export class AdminHandler {
       await this.showFlowStep(
         ctx,
         BotText.confirmBulkHostIpChange({
-          tag: flow.data.tag,
+          tag: flow.data.profileName,
           address: parsed.value,
           total: hosts.length,
           currentAddresses,
@@ -1132,16 +1158,86 @@ export class AdminHandler {
       return;
     }
 
-    const tags = await this.remnawaveService.getAllHostTags();
     await this.showFlowStep(
       ctx,
       BotText.askHostTagSelection(),
-      adminHostTagKeyboard(Array.from(new Set(tags.filter(Boolean))).sort()),
+      adminHostTagKeyboard(await this.getHostProfileOptions()),
     );
   }
 
-  private async getHostsByTag(tag: string): Promise<RemnawaveHost[]> {
+  private async getHostsByProfile(
+    profileUuid: string,
+    inboundUuid: string,
+  ): Promise<RemnawaveHost[]> {
     const hosts = await this.remnawaveService.getAllHosts();
-    return hosts.filter((host) => host.tag === tag);
+    return hosts.filter(
+      (host) =>
+        host.inbound?.configProfileUuid === profileUuid &&
+        host.inbound?.configProfileInboundUuid === inboundUuid,
+    );
+  }
+
+  private async getHostProfileOptions(): Promise<Array<{
+    profileUuid: string;
+    profileName: string;
+    inboundUuid: string;
+    inboundTag: string;
+    hostCount: number;
+  }>> {
+    const [profiles, hosts] = await Promise.all([
+      this.remnawaveService.getConfigProfiles(),
+      this.remnawaveService.getAllHosts(),
+    ]);
+
+    const counts = new Map<string, number>();
+    for (const host of hosts) {
+      const profileUuid = host.inbound?.configProfileUuid;
+      const inboundUuid = host.inbound?.configProfileInboundUuid;
+      if (!profileUuid || !inboundUuid) {
+        continue;
+      }
+
+      const key = `${profileUuid}:${inboundUuid}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+
+    const options: Array<{
+      profileUuid: string;
+      profileName: string;
+      inboundUuid: string;
+      inboundTag: string;
+      hostCount: number;
+    }> = [];
+
+    for (const profile of profiles) {
+      for (const inbound of profile.inbounds) {
+        const key = `${profile.uuid}:${inbound.uuid}`;
+        const hostCount = counts.get(key) ?? 0;
+        if (hostCount === 0) {
+          continue;
+        }
+
+        options.push({
+          profileUuid: profile.uuid,
+          profileName: this.buildProfileOptionLabel(profile, inbound),
+          inboundUuid: inbound.uuid,
+          inboundTag: inbound.tag,
+          hostCount,
+        });
+      }
+    }
+
+    return options.sort((left, right) => left.profileName.localeCompare(right.profileName));
+  }
+
+  private buildProfileOptionLabel(
+    profile: RemnawaveConfigProfile,
+    inbound: RemnawaveConfigProfile['inbounds'][number],
+  ): string {
+    const details = [inbound.type, inbound.port ? String(inbound.port) : null]
+      .filter(Boolean)
+      .join(' • ');
+
+    return details ? `${profile.name} (${details})` : profile.name;
   }
 }

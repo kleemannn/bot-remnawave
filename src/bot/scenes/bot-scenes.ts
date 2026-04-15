@@ -98,9 +98,12 @@ export interface AdminChangeExpirationFlow {
 
 export interface AdminBulkChangeHostIpFlow {
   type: typeof BOT_FLOW.ADMIN_BULK_CHANGE_HOST_IP;
-  step: 'tag' | 'address' | 'confirm';
+  step: 'profile' | 'address' | 'confirm';
   data: {
-    tag?: string;
+    profileUuid?: string;
+    profileName?: string;
+    inboundUuid?: string;
+    inboundTag?: string;
     address?: string;
   };
 }

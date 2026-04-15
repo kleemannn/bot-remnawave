@@ -63,7 +63,8 @@ export const callbackData = {
   adminConfirmChangeLimit: 'admin:limit:confirm',
   adminConfirmChangeExpiration: 'admin:expiration:confirm',
   adminBulkHostIpStart: 'admin:hosts:ip:start',
-  adminHostTagSelect: (tag: string) => `admin:hosts:ip:tag:${encodeURIComponent(tag)}`,
+  adminHostProfileSelect: (profileUuid: string, inboundUuid: string) =>
+    `admin:hosts:ip:profile:${encodeURIComponent(profileUuid)}:${encodeURIComponent(inboundUuid)}`,
   adminConfirmBulkHostIp: 'admin:hosts:ip:confirm',
   adminDeleteDealerAsk: (telegramId: string) => `admin:delete:ask:${telegramId}`,
   adminConfirmDeleteDealer: (telegramId: string) =>

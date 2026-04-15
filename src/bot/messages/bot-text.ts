@@ -486,20 +486,20 @@ export const BotText = {
   },
 
   askHostTagSelection() {
-    return renderCard('🌐 Выбор тега хостов', [
-      'Выберите тег, у которого нужно массово заменить IP.',
+    return renderCard('🌐 Выбор профиля хостов', [
+      'Выберите профиль или inbound, у которого нужно массово заменить IP.',
     ]);
   },
 
   emptyHostTags() {
-    return renderCard('🌐 Теги хостов не найдены', [
-      'В Remnawave пока нет тегов хостов для массового обновления.',
+    return renderCard('🌐 Профили хостов не найдены', [
+      'В Remnawave пока нет профилей с хостами для массового обновления.',
     ]);
   },
 
   askHostAddressForTag(tag: string, hostCount: number) {
     return renderCard('🌐 Новый IP для хостов', [
-      cardLine('🏷', 'Тег', tag),
+      cardLine('🏷', 'Профиль', tag),
       cardLine('🧩', 'Найдено хостов', String(hostCount)),
       'Введите новый IP или host, который нужно поставить всем найденным хостам.',
     ]);
@@ -507,8 +507,8 @@ export const BotText = {
 
   emptyHostsForTag(tag: string) {
     return renderCard('🌐 Хосты не найдены', [
-      cardLine('🏷', 'Тег', tag),
-      'Для этого тега нет хостов. Выберите другой тег.',
+      cardLine('🏷', 'Профиль', tag),
+      'Для этого профиля нет хостов. Выберите другой профиль.',
     ]);
   },
 
@@ -519,7 +519,7 @@ export const BotText = {
     currentAddresses: string[];
   }) {
     return renderCard('🌐 Подтвердите массовую смену IP', [
-      cardLine('🏷', 'Тег', data.tag),
+      cardLine('🏷', 'Профиль', data.tag),
       cardLine('🧩', 'Хостов найдено', String(data.total)),
       cardLine('🆕', 'Новый IP/host', data.address),
       cardLine(
@@ -527,7 +527,7 @@ export const BotText = {
         'Текущие адреса',
         data.currentAddresses.length > 0 ? data.currentAddresses.join(', ') : 'Неизвестно',
       ),
-      'После подтверждения бот обновит все хосты с этим тегом.',
+      'После подтверждения бот обновит все хосты этого профиля.',
     ]);
   },
 
@@ -539,7 +539,7 @@ export const BotText = {
     skipped: number;
   }) {
     return renderCard('✅ Массовая смена IP завершена', [
-      cardLine('🏷', 'Тег', data.tag),
+      cardLine('🏷', 'Профиль', data.tag),
       cardLine('🆕', 'Новый IP/host', data.address),
       cardLine('🧩', 'Всего хостов', String(data.total)),
       cardLine('✅', 'Обновлено', String(data.updated)),

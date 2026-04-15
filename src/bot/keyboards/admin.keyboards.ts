@@ -70,9 +70,22 @@ export function adminTagKeyboard() {
   ]);
 }
 
-export function adminHostTagKeyboard(tags: string[]) {
-  const rows: Button[][] = tags.map((tag) => [
-    { text: `🏷 ${tag}`, callback_data: callbackData.adminHostTagSelect(tag) },
+interface HostProfileOption {
+  profileUuid: string;
+  profileName: string;
+  inboundUuid: string;
+  hostCount: number;
+}
+
+export function adminHostTagKeyboard(options: HostProfileOption[]) {
+  const rows: Button[][] = options.map((option) => [
+    {
+      text: `🌐 ${option.profileName} • ${option.hostCount}`,
+      callback_data: callbackData.adminHostProfileSelect(
+        option.profileUuid,
+        option.inboundUuid,
+      ),
+    },
   ]);
 
   rows.push([{ text: '❌ Отмена', callback_data: callbackData.cancelFlow }]);
