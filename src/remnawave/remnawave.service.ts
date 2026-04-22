@@ -45,6 +45,7 @@ export interface RemnawaveConfigProfile {
 }
 
 type RemnawaveMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+const SUBSCRIPTION_FRAGMENT_VALUE = '80-250,10-100,tlshello';
 
 @Injectable()
 export class RemnawaveService {
@@ -81,7 +82,10 @@ export class RemnawaveService {
       );
     }
 
-    return mapped;
+    return {
+      ...mapped,
+      subscriptionUrl: this.normalizeSubscriptionUrl(mapped.subscriptionUrl),
+    };
   }
 
   async disableUser(remnawaveUserId: string): Promise<void> {
@@ -347,7 +351,9 @@ export class RemnawaveService {
       status: typeof statusCandidate === 'string' ? statusCandidate : undefined,
       expireAt:
         expireAt && !Number.isNaN(expireAt.getTime()) ? expireAt : undefined,
-      subscriptionUrl: this.adapter.fromCreateUserResponse(data)?.subscriptionUrl,
+      subscriptionUrl: this.normalizeSubscriptionUrl(
+        this.adapter.fromCreateUserResponse(data)?.subscriptionUrl,
+      ),
       usedTrafficBytes: this.parseNumberCandidate(usedTrafficCandidate),
       isOnlineNow:
         parsedOnline ??
@@ -603,6 +609,27 @@ export class RemnawaveService {
     }
 
     return undefined;
+  }
+
+  private normalizeSubscriptionUrl(url?: string | null): string | undefined {
+    if (!url || typeof url !== 'string') {
+      return undefined;
+    }
+
+    const trimmed = url.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    const [withoutHash, hash = ''] = trimmed.split('#', 2);
+    if (/[?&]fragment=/.test(withoutHash)) {
+      return trimmed;
+    }
+
+    const separator = withoutHash.includes('?') ? '&' : '?';
+    return `${withoutHash}${separator}fragment=${SUBSCRIPTION_FRAGMENT_VALUE}${
+      hash ? `#${hash}` : ''
+    }`;
   }
 
   private async postWithoutResult(path: string, operation: string): Promise<void> {
