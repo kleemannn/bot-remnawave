@@ -34,23 +34,6 @@ export function clearTransientErrorMessageId(ctx: BotContext) {
   ensureSession(ctx).transientErrorMessageId = undefined;
 }
 
-export function setCreatedSubscriptionLink(
-  ctx: BotContext,
-  subscriptionId: string,
-  link: string,
-) {
-  const session = ensureSession(ctx);
-  session.createdSubscriptionLinks ??= {};
-  session.createdSubscriptionLinks[subscriptionId] = link;
-}
-
-export function getCreatedSubscriptionLink(
-  ctx: BotContext,
-  subscriptionId: string,
-): string | undefined {
-  return ensureSession(ctx).createdSubscriptionLinks?.[subscriptionId];
-}
-
 export function setSentSubscriptionLinkMessageId(ctx: BotContext, messageId: number) {
   ensureSession(ctx).sentSubscriptionLinkMessageId = messageId;
 }

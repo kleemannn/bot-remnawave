@@ -25,10 +25,8 @@ import {
   clearFlow,
   clearFlowMessageId,
   clearSentSubscriptionLinkMessageId,
-  getCreatedSubscriptionLink,
   getSentSubscriptionLinkMessageId,
   setFlow,
-  setCreatedSubscriptionLink,
   setFlowMessageId,
   setSentSubscriptionLinkMessageId,
   setSubscriptionsView,
@@ -164,9 +162,6 @@ export class SubscriptionsHandler {
     clearFlow(ctx);
     clearFlowMessageId(ctx);
     const copyableLink = result.subscriptionUrl;
-    if (copyableLink) {
-      setCreatedSubscriptionLink(ctx, result.subscription.id, copyableLink);
-    }
 
     await renderMessage(
       ctx,
@@ -508,9 +503,6 @@ export class SubscriptionsHandler {
     );
     const view = ctx.session.subscriptionsView ?? { mode: 'all' as const, page: 1 };
     const copyableLink = result.subscriptionUrl;
-    if (copyableLink) {
-      setCreatedSubscriptionLink(ctx, result.subscription.id, copyableLink);
-    }
 
     const subscription = await this.subscriptionsService.getSubscriptionForDealer(
       access.telegramId,
@@ -625,12 +617,10 @@ export class SubscriptionsHandler {
     }
 
     await answerCallback(ctx);
-    const link =
-      getCreatedSubscriptionLink(ctx, subscriptionId) ??
-      (await this.subscriptionsService.getSubscriptionLinkForDealer(
-        access.telegramId,
-        subscriptionId,
-      ));
+    const link = await this.subscriptionsService.getSubscriptionLinkForDealer(
+      access.telegramId,
+      subscriptionId,
+    );
 
     await this.sendSubscriptionLinkMessage(ctx, link);
   }
