@@ -56,6 +56,11 @@ class EnvironmentVariables {
   HAPP_CRYPTO_TIMEOUT_MS?: number;
 
   @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  HAPP_SUBSCRIPTION_FRAGMENT?: string;
+
+  @IsOptional()
   @Matches(/^\d+$/)
   PORT?: string;
 

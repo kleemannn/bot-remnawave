@@ -34,5 +34,6 @@ export default () => ({
   happ: {
     cryptoApiUrl: process.env.HAPP_CRYPTO_API_URL ?? 'https://crypto.happ.su/api-v2.php',
     timeoutMs: Number(process.env.HAPP_CRYPTO_TIMEOUT_MS ?? 10000),
+    subscriptionFragment: process.env.HAPP_SUBSCRIPTION_FRAGMENT?.trim() || undefined,
   },
 });

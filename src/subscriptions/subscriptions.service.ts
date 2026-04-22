@@ -113,16 +113,18 @@ export class SubscriptionsService {
       },
     });
 
+    const subscriptionUrl = this.decorateSubscriptionUrl(remote.subscriptionUrl);
+
     let happEncryptedUrl: string | undefined;
-    if (remote.subscriptionUrl) {
+    if (subscriptionUrl) {
       happEncryptedUrl = await this.happCryptoService.encryptSubscriptionUrl(
-        remote.subscriptionUrl,
+        subscriptionUrl,
       );
     }
 
     return {
       subscription,
-      subscriptionUrl: remote.subscriptionUrl,
+      subscriptionUrl,
       happEncryptedUrl,
     };
   }
@@ -517,16 +519,18 @@ export class SubscriptionsService {
       },
     });
 
+    const subscriptionUrl = this.decorateSubscriptionUrl(remote.subscriptionUrl);
+
     let happEncryptedUrl: string | undefined;
-    if (remote.subscriptionUrl) {
+    if (subscriptionUrl) {
       happEncryptedUrl = await this.happCryptoService.encryptSubscriptionUrl(
-        remote.subscriptionUrl,
+        subscriptionUrl,
       );
     }
 
     return {
       subscription: updated,
-      subscriptionUrl: remote.subscriptionUrl,
+      subscriptionUrl,
       happEncryptedUrl,
     };
   }
@@ -562,7 +566,9 @@ export class SubscriptionsService {
       );
     }
 
-    return this.happCryptoService.encryptSubscriptionUrl(subscriptionUrl);
+    return this.happCryptoService.encryptSubscriptionUrl(
+      this.decorateSubscriptionUrl(subscriptionUrl),
+    );
   }
 
   async exportDealerUsers(dealerTelegramId: bigint): Promise<Array<{ username: string; happUrl: string }>> {
@@ -595,7 +601,9 @@ export class SubscriptionsService {
 
       exported.push({
         username: subscription.dealerUser.username,
-        happUrl: await this.happCryptoService.encryptSubscriptionUrl(subscriptionUrl),
+        happUrl: await this.happCryptoService.encryptSubscriptionUrl(
+          this.decorateSubscriptionUrl(subscriptionUrl),
+        ),
       });
     }
 
@@ -1066,5 +1074,27 @@ export class SubscriptionsService {
 
       return updated;
     });
+  }
+
+  private decorateSubscriptionUrl(
+    subscriptionUrl: string | undefined,
+  ): string | undefined {
+    if (!subscriptionUrl) {
+      return subscriptionUrl;
+    }
+
+    const fragmentValue = this.configService.get<string | undefined>(
+      'happ.subscriptionFragment',
+    );
+    if (!fragmentValue) {
+      return subscriptionUrl;
+    }
+
+    const [base, hashPart = ''] = subscriptionUrl.split('#', 2);
+    const [title = '', existingQuery = ''] = hashPart.split('?', 2);
+    const params = new URLSearchParams(existingQuery);
+    params.set('fragment', fragmentValue);
+
+    return `${base}#${title}?${params.toString()}`;
   }
 }
