@@ -220,14 +220,49 @@ export class RemnawaveService {
       (payload.response as Record<string, unknown> | undefined) ?? payload;
     const nested =
       (response.data as Record<string, unknown> | undefined) ?? response;
+    const userRecord = this.pickNestedRecords([
+      response,
+      nested,
+      this.asRecord(response.user),
+      this.asRecord(nested.user),
+      this.asRecord((response.data as Record<string, unknown> | undefined)?.user),
+      this.asRecord((nested.data as Record<string, unknown> | undefined)?.user),
+      this.asRecord(response.stats),
+      this.asRecord(nested.stats),
+      this.asRecord(response.traffic),
+      this.asRecord(nested.traffic),
+      this.asRecord(response.usage),
+      this.asRecord(nested.usage),
+      this.asRecord(response.session),
+      this.asRecord(nested.session),
+    ]);
 
     const statusCandidate =
-      response.status ?? nested.status;
+      this.pickFirstDefined([
+        this.pickUserStatus(response.status),
+        this.pickUserStatus(nested.status),
+        ...userRecord.map((record) =>
+          this.pickFirstDefined([
+            this.pickUserStatus(record.status),
+            this.pickUserStatus(record.userStatus),
+            this.pickUserStatus(record.state),
+            this.pickUserStatus(record.connectionStatus),
+          ]),
+        ),
+      ]);
     const expireAtCandidate =
-      response.expireAt ??
-      response.expiresAt ??
-      nested.expireAt ??
-      nested.expiresAt;
+      this.pickFirstDefined([
+        response.expireAt,
+        response.expiresAt,
+        nested.expireAt,
+        nested.expiresAt,
+        ...userRecord.flatMap((record) => [
+          record.expireAt,
+          record.expiresAt,
+          record.expiredAt,
+          record.expire_at,
+        ]),
+      ]);
     const usedTrafficCandidate = this.pickFirstDefined([
       response.usedTrafficBytes,
       response.usedTraffic,
@@ -245,6 +280,26 @@ export class RemnawaveService {
       nested.traffic_used,
       (nested.traffic as Record<string, unknown> | undefined)?.usedBytes,
       (nested.traffic as Record<string, unknown> | undefined)?.used,
+      ...userRecord.flatMap((record) => [
+        record.usedTrafficBytes,
+        record.usedTraffic,
+        record.used_traffic,
+        record.trafficUsedBytes,
+        record.trafficUsed,
+        record.traffic_used,
+        record.usedBytes,
+        record.used_bytes,
+        record.bytesUsed,
+        record.bytes_used,
+        record.upload,
+        record.download,
+        record.uploadBytes,
+        record.downloadBytes,
+        this.asRecord(record.traffic)?.usedBytes,
+        this.asRecord(record.traffic)?.used,
+        this.asRecord(record.usage)?.usedBytes,
+        this.asRecord(record.usage)?.used,
+      ]),
     ]);
     const onlineCandidate = this.pickFirstDefined([
       response.isOnline,
@@ -263,12 +318,29 @@ export class RemnawaveService {
       nested.active_now,
       (nested.session as Record<string, unknown> | undefined)?.isOnline,
       (nested.session as Record<string, unknown> | undefined)?.online,
+      ...userRecord.flatMap((record) => [
+        record.isOnline,
+        record.online,
+        record.is_online,
+        record.connected,
+        record.activeNow,
+        record.active_now,
+        record.isActive,
+        record.is_active,
+        record.onlineNow,
+        record.online_now,
+        record.hasActiveSession,
+        record.has_active_session,
+        record.onlineAt ? true : undefined,
+        record.lastSeenAt ? false : undefined,
+      ]),
     ]);
 
     const expireAt =
       typeof expireAtCandidate === 'string' || expireAtCandidate instanceof Date
         ? new Date(expireAtCandidate)
         : undefined;
+    const parsedOnline = this.parseBooleanCandidate(onlineCandidate);
 
     return {
       exists: true,
@@ -277,7 +349,11 @@ export class RemnawaveService {
         expireAt && !Number.isNaN(expireAt.getTime()) ? expireAt : undefined,
       subscriptionUrl: this.adapter.fromCreateUserResponse(data)?.subscriptionUrl,
       usedTrafficBytes: this.parseNumberCandidate(usedTrafficCandidate),
-      isOnlineNow: this.parseBooleanCandidate(onlineCandidate),
+      isOnlineNow:
+        parsedOnline ??
+        this.deriveOnlineFromStatus(
+          typeof statusCandidate === 'string' ? statusCandidate : undefined,
+        ),
     };
   }
 
@@ -433,6 +509,36 @@ export class RemnawaveService {
     return values.find((value) => value !== undefined && value !== null);
   }
 
+  private asRecord(value: unknown): Record<string, unknown> | undefined {
+    return value && typeof value === 'object'
+      ? (value as Record<string, unknown>)
+      : undefined;
+  }
+
+  private pickNestedRecords(
+    values: Array<Record<string, unknown> | undefined>,
+  ): Record<string, unknown>[] {
+    return values.filter((value): value is Record<string, unknown> => Boolean(value));
+  }
+
+  private pickUserStatus(value: unknown): string | undefined {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+
+    const normalized = value.trim();
+    if (!normalized) {
+      return undefined;
+    }
+
+    const ignored = ['ok', 'success', 'error'];
+    if (ignored.includes(normalized.toLowerCase())) {
+      return undefined;
+    }
+
+    return normalized;
+  }
+
   private parseNumberCandidate(value: unknown): number | undefined {
     if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
       return value;
@@ -477,6 +583,23 @@ export class RemnawaveService {
       if (['false', '0', 'offline', 'disconnected', 'inactive'].includes(normalized)) {
         return false;
       }
+    }
+
+    return undefined;
+  }
+
+  private deriveOnlineFromStatus(status?: string): boolean | undefined {
+    if (!status) {
+      return undefined;
+    }
+
+    const normalized = status.trim().toLowerCase();
+    if (['online', 'connected', 'active'].includes(normalized)) {
+      return true;
+    }
+
+    if (['offline', 'disconnected', 'inactive'].includes(normalized)) {
+      return false;
     }
 
     return undefined;
