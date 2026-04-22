@@ -31,8 +31,4 @@ export default () => ({
     retryCount: Number(process.env.REMNAWAVE_RETRY_COUNT ?? 1),
     retryDelayMs: Number(process.env.REMNAWAVE_RETRY_DELAY_MS ?? 500),
   },
-  happ: {
-    cryptoApiUrl: process.env.HAPP_CRYPTO_API_URL ?? 'https://crypto.happ.su/api-v2.php',
-    timeoutMs: Number(process.env.HAPP_CRYPTO_TIMEOUT_MS ?? 10000),
-  },
 });

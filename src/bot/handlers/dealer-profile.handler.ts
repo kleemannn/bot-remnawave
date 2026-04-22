@@ -56,7 +56,7 @@ export class DealerProfileHandler {
     }
 
     const content = rows
-      .map((row, index) => `${index + 1}. ${row.username}\n${row.happUrl}`)
+      .map((row, index) => `${index + 1}. ${row.username}\n${row.subscriptionUrl}`)
       .join('\n\n');
 
     const fileName = `dealer-users-${access.telegramId.toString()}.txt`;

@@ -46,16 +46,6 @@ class EnvironmentVariables {
   REMNAWAVE_TIMEOUT_MS?: number;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  HAPP_CRYPTO_API_URL?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1000)
-  HAPP_CRYPTO_TIMEOUT_MS?: number;
-
-  @IsOptional()
   @Matches(/^\d+$/)
   PORT?: string;
 

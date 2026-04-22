@@ -163,7 +163,7 @@ export class SubscriptionsHandler {
 
     clearFlow(ctx);
     clearFlowMessageId(ctx);
-    const copyableLink = result.happEncryptedUrl ?? result.subscriptionUrl;
+    const copyableLink = result.subscriptionUrl;
     if (copyableLink) {
       setCreatedSubscriptionLink(ctx, result.subscription.id, copyableLink);
     }
@@ -178,7 +178,6 @@ export class SubscriptionsHandler {
         dealerUsername: access.dealer.username,
         dealerTelegramId: access.dealer.telegramId,
         expiresAt: result.subscription.expiresAt,
-        happEncryptedUrl: result.happEncryptedUrl,
         subscriptionUrl: result.subscriptionUrl,
       }),
       dealerAfterCreateKeyboard(result.subscription.id, Boolean(copyableLink)),
@@ -508,7 +507,7 @@ export class SubscriptionsHandler {
         ),
     );
     const view = ctx.session.subscriptionsView ?? { mode: 'all' as const, page: 1 };
-    const copyableLink = result.happEncryptedUrl ?? result.subscriptionUrl;
+    const copyableLink = result.subscriptionUrl;
     if (copyableLink) {
       setCreatedSubscriptionLink(ctx, result.subscription.id, copyableLink);
     }

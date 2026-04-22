@@ -55,8 +55,6 @@ export const callbackData = {
   adminChangeExpirationStart: 'admin:expiration:start',
   adminChangeExpirationForDealer: (telegramId: string) =>
     `admin:expiration:start:${telegramId}`,
-  adminRecreateAllSubscriptionsAsk: 'admin:subs:recreate:ask',
-  adminRecreateAllSubscriptionsConfirm: 'admin:subs:recreate:confirm',
   adminStats: 'admin:stats',
   adminConfirmAddDealer: 'admin:add:confirm',
   adminConfirmChangeTag: 'admin:tag:confirm',

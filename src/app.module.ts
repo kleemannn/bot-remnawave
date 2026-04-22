@@ -15,7 +15,6 @@ import { RemnawaveModule } from './remnawave/remnawave.module';
 import { BotModule } from './bot/bot.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { LoggerModule } from './common/logger/logger.module';
-import { HappModule } from './happ/happ.module';
 import { HealthModule } from './health/health.module';
 import { ErrorsModule } from './common/errors/errors.module';
 import { AuditModule } from './common/audit/audit.module';
@@ -80,7 +79,6 @@ import { AuditModule } from './common/audit/audit.module';
     DealersModule,
     SubscriptionsModule,
     RemnawaveModule,
-    HappModule,
     BotModule,
     NotificationsModule,
     HealthModule,

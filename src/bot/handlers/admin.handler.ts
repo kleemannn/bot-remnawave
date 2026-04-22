@@ -3,7 +3,6 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AddDealerDto } from '../../dealers/dto/add-dealer.dto';
 import { DealersService } from '../../dealers/dealers.service';
-import { SubscriptionsService } from '../../subscriptions/subscriptions.service';
 import { RemnawaveConfigProfile, RemnawaveHost, RemnawaveService } from '../../remnawave/remnawave.service';
 import { BOT_UI } from '../constants/bot-ui.constants';
 import { BotContext } from '../interfaces/bot-context.interface';
@@ -43,7 +42,6 @@ import { BotProtectionService } from '../services/bot-protection.service';
 export class AdminHandler {
   constructor(
     private readonly dealersService: DealersService,
-    private readonly subscriptionsService: SubscriptionsService,
     private readonly remnawaveService: RemnawaveService,
     private readonly accessHandler: BotAccessHandler,
     private readonly menuHandler: MenuHandler,
@@ -709,43 +707,6 @@ export class AdminHandler {
         updated: result.updated,
         skipped: result.skipped,
       }),
-      adminSuccessKeyboard(),
-    );
-  }
-
-  async askRecreateAllSubscriptionsConfirmation(ctx: BotContext) {
-    if (!(await this.accessHandler.ensureAdmin(ctx))) {
-      return;
-    }
-
-    clearFlow(ctx);
-    clearFlowMessageId(ctx);
-
-    await renderMessage(
-      ctx,
-      BotText.confirmRecreateAllSubscriptions(),
-      confirmationKeyboard(callbackData.adminRecreateAllSubscriptionsConfirm),
-    );
-  }
-
-  async confirmRecreateAllSubscriptions(ctx: BotContext) {
-    const access = await this.accessHandler.ensureAdmin(ctx);
-    if (!access) {
-      return;
-    }
-
-    const result = await this.protectionService.runExpensiveAction(
-      access.telegramId.toString(),
-      `admin:recreate-all-subscriptions`,
-      () => this.subscriptionsService.recreateAllSubscriptionsForAdmin(access.telegramId),
-    );
-
-    clearFlow(ctx);
-    clearFlowMessageId(ctx);
-
-    await renderMessage(
-      ctx,
-      BotText.recreateAllSubscriptionsResult(result),
       adminSuccessKeyboard(),
     );
   }

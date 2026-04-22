@@ -50,12 +50,6 @@ export function adminManagementKeyboard() {
         callback_data: callbackData.adminBulkHostIpStart,
       },
     ],
-    [
-      {
-        text: '♻️ Пересоздать все подписки',
-        callback_data: callbackData.adminRecreateAllSubscriptionsAsk,
-      },
-    ],
     [{ text: '🔙 Назад', callback_data: callbackData.adminMenu }],
   ]);
 }
