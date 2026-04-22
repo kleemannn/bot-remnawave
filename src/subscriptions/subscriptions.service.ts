@@ -113,18 +113,16 @@ export class SubscriptionsService {
       },
     });
 
-    const subscriptionUrl = this.decorateSubscriptionUrl(remote.subscriptionUrl);
-
     let happEncryptedUrl: string | undefined;
-    if (subscriptionUrl) {
+    if (remote.subscriptionUrl) {
       happEncryptedUrl = await this.happCryptoService.encryptSubscriptionUrl(
-        subscriptionUrl,
+        remote.subscriptionUrl,
       );
     }
 
     return {
       subscription,
-      subscriptionUrl,
+      subscriptionUrl: remote.subscriptionUrl,
       happEncryptedUrl,
     };
   }
@@ -519,18 +517,16 @@ export class SubscriptionsService {
       },
     });
 
-    const subscriptionUrl = this.decorateSubscriptionUrl(remote.subscriptionUrl);
-
     let happEncryptedUrl: string | undefined;
-    if (subscriptionUrl) {
+    if (remote.subscriptionUrl) {
       happEncryptedUrl = await this.happCryptoService.encryptSubscriptionUrl(
-        subscriptionUrl,
+        remote.subscriptionUrl,
       );
     }
 
     return {
       subscription: updated,
-      subscriptionUrl,
+      subscriptionUrl: remote.subscriptionUrl,
       happEncryptedUrl,
     };
   }
@@ -566,12 +562,7 @@ export class SubscriptionsService {
       );
     }
 
-    const decoratedSubscriptionUrl =
-      this.decorateSubscriptionUrl(subscriptionUrl) ?? subscriptionUrl;
-
-    return this.happCryptoService.encryptSubscriptionUrl(
-      decoratedSubscriptionUrl,
-    );
+    return this.happCryptoService.encryptSubscriptionUrl(subscriptionUrl);
   }
 
   async exportDealerUsers(dealerTelegramId: bigint): Promise<Array<{ username: string; happUrl: string }>> {
@@ -602,14 +593,9 @@ export class SubscriptionsService {
         continue;
       }
 
-      const decoratedSubscriptionUrl =
-        this.decorateSubscriptionUrl(subscriptionUrl) ?? subscriptionUrl;
-
       exported.push({
         username: subscription.dealerUser.username,
-        happUrl: await this.happCryptoService.encryptSubscriptionUrl(
-          decoratedSubscriptionUrl,
-        ),
+        happUrl: await this.happCryptoService.encryptSubscriptionUrl(subscriptionUrl),
       });
     }
 
@@ -1080,27 +1066,5 @@ export class SubscriptionsService {
 
       return updated;
     });
-  }
-
-  private decorateSubscriptionUrl(
-    subscriptionUrl: string | undefined,
-  ): string | undefined {
-    if (!subscriptionUrl) {
-      return subscriptionUrl;
-    }
-
-    const fragmentValue = this.configService.get<string | undefined>(
-      'happ.subscriptionFragment',
-    );
-    if (!fragmentValue) {
-      return subscriptionUrl;
-    }
-
-    const [base, hashPart = ''] = subscriptionUrl.split('#', 2);
-    const [title = '', existingQuery = ''] = hashPart.split('?', 2);
-    const params = new URLSearchParams(existingQuery);
-    params.set('fragment', fragmentValue);
-
-    return `${base}#${title}?${params.toString()}`;
   }
 }
