@@ -566,8 +566,11 @@ export class SubscriptionsService {
       );
     }
 
+    const decoratedSubscriptionUrl =
+      this.decorateSubscriptionUrl(subscriptionUrl) ?? subscriptionUrl;
+
     return this.happCryptoService.encryptSubscriptionUrl(
-      this.decorateSubscriptionUrl(subscriptionUrl),
+      decoratedSubscriptionUrl,
     );
   }
 
@@ -599,10 +602,13 @@ export class SubscriptionsService {
         continue;
       }
 
+      const decoratedSubscriptionUrl =
+        this.decorateSubscriptionUrl(subscriptionUrl) ?? subscriptionUrl;
+
       exported.push({
         username: subscription.dealerUser.username,
         happUrl: await this.happCryptoService.encryptSubscriptionUrl(
-          this.decorateSubscriptionUrl(subscriptionUrl),
+          decoratedSubscriptionUrl,
         ),
       });
     }
